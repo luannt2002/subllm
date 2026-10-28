@@ -193,7 +193,8 @@ Python OpenAI SDK: `base_url="http://127.0.0.1:18080/v1"`, `api_key` = giá tr�
   `expires_in` của phản hồi refresh.
 - `codex login` / `claude login` lại khi refresh bị từ chối (`/status` và log
   ghi lỗi). Refresh token đã bị từ chối (400/401/403) không được gửi lại cho
-  tới khi file có token khác, nên request sau báo lỗi ngay, không chờ mạng.
+  tới khi file có token khác: khi token cũ hết hạn, request báo lỗi ngay, không
+  chờ mạng (trước đó vẫn dùng tạm token cũ, chỉ log ghi lỗi).
 - Refresh chạy đến cùng dù client đã huỷ request: server có thể đã đổi token,
   bỏ dở là file giữ token chết. Refresh lỗi mà token cũ còn hạn → dùng tạm
   token cũ (log ghi lại), request sau thử lại.

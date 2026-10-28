@@ -16,8 +16,8 @@ ngày 28/10 trên provider kiểu `codex`.
 | chọn model | lấy `id` từ `GET /v1/models`; model được route theo tiền tố (`MODEL_PREFIX`) tới nhóm tài khoản tương ứng |
 
 subllm chỉ nghe ở loopback: ứng dụng phải chạy cùng máy, và gọi từ chương trình
-(curl, SDK, backend của ứng dụng) — request từ trình duyệt (có header `Origin`)
-hoặc với `Host` không phải loopback bị chặn 403.
+(curl, SDK, backend của ứng dụng) — request từ trình duyệt (có header `Origin`, kể cả
+extension và giao diện app Electron) hoặc với `Host` không phải loopback bị chặn 403.
 
 ## 1. Hỏi – đáp text
 

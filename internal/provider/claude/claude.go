@@ -199,8 +199,11 @@ func decodeEvent(data []byte) (provider.StreamEvent, error) {
 	case "message_delta":
 		out := ev.Usage.OutputTokens
 		res := provider.StreamEvent{Usage: &provider.Usage{CompletionTokens: out, TotalTokens: out}}
-		if ev.Delta.StopReason == "max_tokens" {
-			res.Finish = "length" // bị cắt: không được báo "stop"
+		switch ev.Delta.StopReason { // bị cắt / từ chối: không được báo "stop"
+		case "max_tokens", "model_context_window_exceeded":
+			res.Finish = "length"
+		case "refusal":
+			res.Finish = "content_filter"
 		}
 		return res, nil
 	case "error":

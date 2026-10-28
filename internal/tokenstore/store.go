@@ -143,6 +143,7 @@ func (s *Store) Get(ctx context.Context) (Credentials, error) {
 	}
 	if s.LastRefreshKey != "" {
 		doc[s.LastRefreshKey] = time.Now().UTC().Format(time.RFC3339Nano) // gốc file, như Codex CLI ghi
+		delete(tok, s.LastRefreshKey)                                     // bản subllm cũ ghi nhầm vào đây
 	}
 	if err := s.save(doc, tok); err != nil {
 		return Credentials{}, fmt.Errorf("ghi ngược token vào %s: %w", s.Path, err)

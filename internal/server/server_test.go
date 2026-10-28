@@ -230,6 +230,14 @@ func TestRejectsBrowserAndForeignHost(t *testing.T) {
 			t.Fatalf("%s origin=%q: muốn %d, nhận %d %s", tc.url, tc.origin, tc.want, rec.Code, rec.Body)
 		}
 	}
+	// HTTP/1.0 không có Host: không phải trình duyệt (trình duyệt luôn gửi Host) → cho qua.
+	req := httptest.NewRequest("GET", "http://127.0.0.1/healthz", nil)
+	req.Host = ""
+	rec := httptest.NewRecorder()
+	s.ServeHTTP(rec, req)
+	if rec.Code != 200 {
+		t.Fatalf("request không Host phải 200, nhận %d", rec.Code)
+	}
 }
 
 // spy — provider giả ghi lại request nhận được.

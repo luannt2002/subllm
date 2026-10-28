@@ -60,8 +60,12 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// loopbackHost — Host header là 127.0.0.1 / ::1 / localhost (có hoặc không port).
+// loopbackHost — Host header là 127.0.0.1 / ::1 / localhost (có hoặc không
+// port), hoặc trống.
 func loopbackHost(hostport string) bool {
+	if hostport == "" {
+		return true // HTTP/1.0 không Host: trình duyệt luôn gửi Host
+	}
 	host, _, err := net.SplitHostPort(hostport)
 	if err != nil {
 		host = hostport

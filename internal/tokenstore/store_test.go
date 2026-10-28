@@ -208,7 +208,7 @@ func TestRefreshWritesThroughSymlink(t *testing.T) {
 // trong tokens thì CLI vẫn thấy mốc cũ và tự refresh thêm, xoay token lần nữa.
 func TestLastRefreshAtRoot(t *testing.T) {
 	srv, _, _ := refreshServer(t, map[string]any{"access_token": jwtAt(time.Now().Add(time.Hour)), "refresh_token": "rt1"})
-	path := writeFile(t, `{"auth_mode":"chatgpt","last_refresh":"2020-01-01T00:00:00Z","tokens":{"access_token":"`+jwtAt(time.Now().Add(-time.Hour))+`","refresh_token":"rt0"}}`)
+	path := writeFile(t, `{"auth_mode":"chatgpt","last_refresh":"2020-01-01T00:00:00Z","tokens":{"access_token":"`+jwtAt(time.Now().Add(-time.Hour))+`","refresh_token":"rt0","last_refresh":"bản cũ ghi nhầm"}}`)
 	if _, err := codexStore(path, srv.URL).Get(context.Background()); err != nil {
 		t.Fatal(err)
 	}

@@ -99,6 +99,8 @@ func TestContentParts(t *testing.T) {
 		// thiếu "type" mà mang ảnh/file: trước đây thành chữ rỗng, ảnh rơi lặng lẽ
 		`[{"image_url":{"url":"data:image/png;base64,AAA"}}]`,
 		`[{"file":{"filename":"a.pdf","file_data":"data:application/pdf;base64,BBB"}}]`,
+		`[{"file":{"file_id":"file-1"}}]`,
+		`[{"input_audio":{"data":"x","format":"wav"}}]`,
 	} {
 		if _, err := (ChatMessage{Content: json.RawMessage(bad)}).Parts(); err == nil {
 			t.Fatalf("phải lỗi: %s", bad)
