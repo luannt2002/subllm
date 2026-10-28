@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/luannt2002/subllm/internal/provider"
 	"github.com/luannt2002/subllm/internal/server"
@@ -43,6 +44,8 @@ func main() {
 	addr := net.JoinHostPort(cfg.Host, strconv.Itoa(cfg.Port))
 	log.Printf("subllm nghe tại http://%s (provider: %s)", addr, strings.Join(ids, ", "))
 	router := provider.NewRouter(cfg.Providers, cfg.Cooldown)
-	srv := &http.Server{Addr: addr, Handler: server.New(router, cfg.APIKey)}
+	// ReadHeaderTimeout: client mở kết nối rồi gửi header nhỏ giọt không giữ
+	// được goroutine mãi. Không đặt WriteTimeout — sẽ cắt stream dài.
+	srv := &http.Server{Addr: addr, Handler: server.New(router, cfg.APIKey), ReadHeaderTimeout: 10 * time.Second}
 	log.Fatal(srv.ListenAndServe())
 }
