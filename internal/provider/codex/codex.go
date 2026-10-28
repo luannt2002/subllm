@@ -146,6 +146,9 @@ func decodeEvent(data []byte) (provider.StreamEvent, error) {
 				TotalTokens  int `json:"total_tokens"`
 			} `json:"usage"`
 		} `json:"response"`
+		Error *struct {
+			Type string `json:"type"`
+		} `json:"error"`
 	}
 	if err := json.Unmarshal(data, &ev); err != nil {
 		return provider.StreamEvent{}, fmt.Errorf("parse sự kiện codex: %w", err)
@@ -160,7 +163,12 @@ func decodeEvent(data []byte) (provider.StreamEvent, error) {
 		}
 		return out, nil
 	case ev.Type == "response.failed" || strings.HasPrefix(ev.Type, "error"):
-		return provider.StreamEvent{}, fmt.Errorf("backend codex lỗi: %s", provider.Truncate(data, provider.ErrSnippet))
+		err := fmt.Errorf("backend codex lỗi: %s", provider.Truncate(data, provider.ErrSnippet))
+		if ev.Error != nil && ev.Error.Type == "invalid_request_error" {
+			// request sai báo giữa stream (vd link ảnh không tải được): 400, không failover
+			return provider.StreamEvent{}, &provider.RequestError{Err: err}
+		}
+		return provider.StreamEvent{}, err
 	}
 	return provider.StreamEvent{}, nil // sự kiện khác (created, in_progress…) bỏ qua
 }

@@ -181,6 +181,7 @@ func decodeEvent(data []byte) (provider.StreamEvent, error) {
 			OutputTokens int `json:"output_tokens"`
 		} `json:"usage"`
 		Error *struct {
+			Type    string `json:"type"`
 			Message string `json:"message"`
 		} `json:"error"`
 	}
@@ -204,7 +205,11 @@ func decodeEvent(data []byte) (provider.StreamEvent, error) {
 		if ev.Error == nil {
 			return provider.StreamEvent{}, fmt.Errorf("backend claude lỗi: %s", provider.Truncate(data, provider.ErrSnippet))
 		}
-		return provider.StreamEvent{}, fmt.Errorf("backend claude lỗi: %s", ev.Error.Message)
+		err := fmt.Errorf("backend claude lỗi: %s", ev.Error.Message)
+		if ev.Error.Type == "invalid_request_error" {
+			return provider.StreamEvent{}, &provider.RequestError{Err: err} // request sai: 400, không failover
+		}
+		return provider.StreamEvent{}, err
 	}
 	return provider.StreamEvent{}, nil
 }

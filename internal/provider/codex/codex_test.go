@@ -91,8 +91,16 @@ func TestCodexEvent(t *testing.T) {
 	if ev.Usage == nil || ev.Usage.PromptTokens != 10 || ev.Usage.TotalTokens != 15 {
 		t.Fatalf("usage codex sai: %+v", ev.Usage)
 	}
-	if _, err := decodeEvent([]byte(`{"type":"response.failed"}`)); err == nil {
-		t.Fatal("response.failed phải là lỗi")
+	_, err = decodeEvent([]byte(`{"type":"response.failed"}`))
+	var re *provider.RequestError
+	if err == nil || errors.As(err, &re) {
+		t.Fatalf("response.failed phải là lỗi backend (502), không phải lỗi request: %T %v", err, err)
+	}
+	// Lỗi request báo giữa stream (payload thật: backend không tải được link
+	// ảnh) → RequestError → client 400, không failover.
+	_, err = decodeEvent([]byte(`{"type":"error","error":{"message":"Error while downloading file. Upstream status code: 400.","type":"invalid_request_error","param":"url","code":"invalid_value"}}`))
+	if !errors.As(err, &re) {
+		t.Fatalf("invalid_request_error phải là RequestError, nhận %T %v", err, err)
 	}
 	// sự kiện bỏ qua: created, in_progress…
 	ev, _ = decodeEvent([]byte(`{"type":"response.created"}`))

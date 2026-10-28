@@ -111,12 +111,12 @@ thì `message` mở đầu bằng tên provider đã thử cuối.
 
 | HTTP | `type` | nghĩa | client nên |
 |---|---|---|---|
-| 400 | `invalid_request_error` | request sai: thiếu `model`/`messages`, vai lạ, part chưa hỗ trợ, `reasoning_effort` sai | sửa request, **không** thử lại |
+| 400 | `invalid_request_error` | request sai: thiếu `model`/`messages`, vai lạ, part chưa hỗ trợ, `reasoning_effort` sai, backend không tải được link ảnh | sửa request, **không** thử lại |
 | 401 | `auth` | thiếu/sai API key | sửa key |
 | 404 | `model_not_found` | model không khớp tiền tố nào, hoặc `provider` không tồn tại | kiểm `GET /v1/models` / `GET /status` |
 | 405 | `invalid_request_error` | không dùng POST | dùng POST |
 | 429 | `rate_limit_error` | mọi tài khoản của nhóm đang dính hạn mức | chờ đúng `Retry-After` (giây, luôn có) rồi thử lại |
-| 502 | `upstream_error` | backend lỗi / mất mạng / backend không tải được link ảnh | thử lại vài lần có giãn cách; lặp lại thì xem log server |
+| 502 | `upstream_error` | backend lỗi / mất mạng | thử lại vài lần có giãn cách; lặp lại thì xem log server |
 
 Ví dụ client tối giản có tôn trọng `Retry-After` (chỉ dùng thư viện chuẩn
 Python):

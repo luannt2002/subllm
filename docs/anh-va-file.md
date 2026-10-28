@@ -106,7 +106,7 @@ một mã riêng (vd `JPG-5821`), script tự kiểm câu trả lời có chép 
 | 400 | `file cần file_data (data URI base64); file_id chưa hỗ trợ` | gửi `file_id` thay vì nội dung file |
 | 400 | `image_url.url trống` | part ảnh thiếu `url` |
 | 400 | `role "system" chỉ nhận text, không nhận image` | ảnh/file đặt ngoài tin nhắn `user` |
-| 502 | `Error while downloading file. Upstream status code: …` | backend không tải được link ảnh; đáng lẽ là 400, subllm hiện trả 502 |
+| 400 | `Error while downloading file. Upstream status code: …` | backend không tải được link ảnh (host chặn, link chết): gửi base64 thay link |
 
 ## Chưa hỗ trợ / chưa thử
 

@@ -97,8 +97,13 @@ func TestClaudeEvent(t *testing.T) {
 	if !ev.Done {
 		t.Fatal("message_stop phải Done")
 	}
-	if _, err := decodeEvent([]byte(`{"type":"error","error":{"message":"rate limited"}}`)); err == nil {
-		t.Fatal("error event phải là lỗi")
+	var re *provider.RequestError
+	if _, err := decodeEvent([]byte(`{"type":"error","error":{"type":"overloaded_error","message":"quá tải"}}`)); err == nil || errors.As(err, &re) {
+		t.Fatalf("error event của backend phải là lỗi backend (502), không phải lỗi request: %T %v", err, err)
+	}
+	// Lỗi request báo giữa stream → RequestError → client 400, không failover.
+	if _, err := decodeEvent([]byte(`{"type":"error","error":{"type":"invalid_request_error","message":"ảnh hỏng"}}`)); !errors.As(err, &re) {
+		t.Fatalf("invalid_request_error phải là RequestError, nhận %T %v", err, err)
 	}
 	// error event thiếu object "error": vẫn là lỗi, không được panic.
 	if _, err := decodeEvent([]byte(`{"type":"error"}`)); err == nil {
