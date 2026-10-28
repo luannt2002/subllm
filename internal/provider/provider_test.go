@@ -84,6 +84,10 @@ func TestContentParts(t *testing.T) {
 			t.Fatalf("part[%d] = %+v, muốn %+v", i, parts[i], want[i])
 		}
 	}
+	// part chỉ có chữ mà thiếu "type": vẫn là text (client cũ gửi vậy).
+	if parts, err := (ChatMessage{Content: json.RawMessage(`[{"text":"không type"}]`)}).Parts(); err != nil || len(parts) != 1 || parts[0] != (Part{Type: PartText, Text: "không type"}) {
+		t.Fatalf("part chữ thiếu type phải là text: %+v %v", parts, err)
+	}
 	if parts, _ := (ChatMessage{Content: json.RawMessage(`"chỉ chữ"`)}).Parts(); len(parts) != 1 || parts[0] != (Part{Type: PartText, Text: "chỉ chữ"}) {
 		t.Fatalf("content string phải thành 1 part text: %+v", parts)
 	}
@@ -92,6 +96,9 @@ func TestContentParts(t *testing.T) {
 		`[{"type":"input_audio","input_audio":{"data":"x","format":"wav"}}]`,
 		`[{"type":"image_url","image_url":{}}]`,
 		`[{"type":"file","file":{"file_id":"file-1"}}]`,
+		// thiếu "type" mà mang ảnh/file: trước đây thành chữ rỗng, ảnh rơi lặng lẽ
+		`[{"image_url":{"url":"data:image/png;base64,AAA"}}]`,
+		`[{"file":{"filename":"a.pdf","file_data":"data:application/pdf;base64,BBB"}}]`,
 	} {
 		if _, err := (ChatMessage{Content: json.RawMessage(bad)}).Parts(); err == nil {
 			t.Fatalf("phải lỗi: %s", bad)

@@ -61,6 +61,10 @@ func (m ChatMessage) Parts() ([]Part, error) {
 	for i, p := range raw {
 		switch p.Type {
 		case "text", "":
+			if p.Type == "" && (p.ImageURL.URL != "" || p.File.FileData != "") {
+				// coi là chữ thì ảnh/file rơi lặng lẽ; part chỉ có chữ thì vẫn nhận
+				return nil, fmt.Errorf("content[%d]: part thiếu \"type\" (ảnh: \"image_url\", file: \"file\")", i)
+			}
 			parts = append(parts, Part{Type: PartText, Text: p.Text})
 		case "image_url":
 			if p.ImageURL.URL == "" {
