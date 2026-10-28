@@ -44,7 +44,7 @@ func (r Registry) Route(model string) (Provider, error) {
 			return p, nil
 		}
 	}
-	return nil, fmt.Errorf("không có backend nào nhận model %q (subllm phục vụ: %s)", model, r.ids("-*"))
+	return nil, fmt.Errorf("không có provider nào nhận model %q — model phải mang MODEL_PREFIX của một provider (%s); danh sách model: GET /v1/models", model, r.ids())
 }
 
 // ByID — tìm strategy đích danh theo tên ("codex", "claude"…); dùng khi
@@ -55,14 +55,14 @@ func (r Registry) ByID(id string) (Provider, error) {
 			return p, nil
 		}
 	}
-	return nil, fmt.Errorf("không có provider %q (subllm có: %s)", id, r.ids(""))
+	return nil, fmt.Errorf("không có provider %q (subllm có: %s)", id, r.ids())
 }
 
-// ids — liệt kê ID các strategy (kèm hậu tố) cho thông báo lỗi.
-func (r Registry) ids(suffix string) string {
+// ids — liệt kê ID các strategy cho thông báo lỗi.
+func (r Registry) ids() string {
 	out := make([]string, 0, len(r))
 	for _, p := range r {
-		out = append(out, p.ID()+suffix)
+		out = append(out, p.ID())
 	}
 	return strings.Join(out, ", ")
 }
