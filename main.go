@@ -8,12 +8,17 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"flag"
 	"log"
 	"net"
 	"net/http"
+	"os"
+	"os/signal"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/luannt2002/subllm/internal/provider"
@@ -47,5 +52,23 @@ func main() {
 	// ReadHeaderTimeout: client mở kết nối rồi gửi header nhỏ giọt không giữ
 	// được goroutine mãi. Không đặt WriteTimeout — sẽ cắt stream dài.
 	srv := &http.Server{Addr: addr, Handler: server.New(router, cfg.APIKey), ReadHeaderTimeout: 10 * time.Second}
-	log.Fatal(srv.ListenAndServe())
+	// SIGTERM/Ctrl-C: ngừng nhận request mới, chờ request đang chạy xong rồi
+	// mới thoát — kill giữa lúc refresh (server đã xoay token, chưa ghi file)
+	// là mất đăng nhập. Gọi upstream bị chặn bởi TIMEOUT, nhưng client ngừng
+	// đọc stream thì không: khi đó gửi tín hiệu lần hai để thoát ngay.
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	done := make(chan struct{})
+	go func() {
+		<-ctx.Done()
+		stop()
+		log.Printf("đang tắt: chờ request đang chạy xong (gửi tín hiệu lần nữa để thoát ngay)")
+		_ = srv.Shutdown(context.Background())
+		close(done)
+	}()
+	if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
+		log.Fatal(err)
+	}
+	<-done
+	log.Printf("đã tắt")
 }
