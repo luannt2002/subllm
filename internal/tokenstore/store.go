@@ -229,6 +229,9 @@ func (s *Store) save(doc map[string]any, tok map[string]any) error {
 	}
 	tmp := f.Name()
 	_, err = f.Write(append(clean, '\n'))
+	if err == nil {
+		err = f.Sync() // xuống đĩa trước rename: mất điện không để lại file rỗng
+	}
 	if cerr := f.Close(); err == nil {
 		err = cerr
 	}
