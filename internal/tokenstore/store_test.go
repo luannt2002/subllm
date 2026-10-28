@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -269,5 +270,34 @@ func TestRejectedRefreshTokenNotResent(t *testing.T) {
 	s.Get(context.Background())
 	if n.Load() != 4 {
 		t.Fatalf("429 là lỗi tạm, phải thử lại: server nhận %d lần (muốn 4)", n.Load())
+	}
+}
+
+// Nhiều request cùng lúc gặp token hết hạn: chỉ đúng một lượt refresh, các
+// request kia đọc lại file đã có token mới. Hai lượt cùng gửi một refresh
+// token là lượt sau bị từ chối (token đã xoay) → văng đăng nhập.
+func TestConcurrentGetRefreshesOnce(t *testing.T) {
+	var n atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		n.Add(1)
+		time.Sleep(50 * time.Millisecond) // nới cửa sổ để race lộ ra nếu thiếu khoá
+		json.NewEncoder(w).Encode(map[string]any{"access_token": jwtAt(time.Now().Add(time.Hour)), "refresh_token": "rt1"})
+	}))
+	defer srv.Close()
+	path := writeFile(t, `{"tokens":{"access_token":"`+jwtAt(time.Now().Add(-time.Hour))+`","refresh_token":"rt0"}}`)
+	s := codexStore(path, srv.URL)
+	var wg sync.WaitGroup
+	for i := 0; i < 5; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if _, err := s.Get(context.Background()); err != nil {
+				t.Error(err)
+			}
+		}()
+	}
+	wg.Wait()
+	if n.Load() != 1 {
+		t.Fatalf("5 request đồng thời phải refresh đúng 1 lần, server nhận %d", n.Load())
 	}
 }
