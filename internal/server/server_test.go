@@ -124,6 +124,23 @@ func TestStatusNeedsKey(t *testing.T) {
 	}
 }
 
+// Authorization theo RFC 7235: scheme "Bearer" (không phân biệt hoa thường)
+// + key đúng; key trần không có scheme, scheme khác hay key sai → 401.
+func TestAuthorizationHeader(t *testing.T) {
+	s := New(provider.NewRouter(provider.Registry{&fake{id: "acc1"}}, time.Minute), "k")
+	for h, want := range map[string]int{"Bearer k": 200, "bearer k": 200, "Bearer  k": 200, "Bearer\tk": 200, "k": 401, "Bearer kk": 401, "Bearer ": 401, "Basic k": 401, "": 401} {
+		req := httptest.NewRequest("GET", "http://127.0.0.1/status", nil)
+		if h != "" {
+			req.Header.Set("Authorization", h)
+		}
+		rec := httptest.NewRecorder()
+		s.ServeHTTP(rec, req)
+		if rec.Code != want {
+			t.Fatalf("Authorization %q: muốn %d, nhận %d", h, want, rec.Code)
+		}
+	}
+}
+
 // /v1/models cũng lộ tên tài khoản (owned_by) và gọi upstream bằng
 // credential: có api key thì phải đòi như /status.
 func TestModelsNeedsKey(t *testing.T) {

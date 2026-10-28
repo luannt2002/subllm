@@ -5,6 +5,7 @@
 package server
 
 import (
+	"crypto/subtle"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -32,7 +33,7 @@ type Server struct {
 	reqCount atomic.Int64
 }
 
-// New — apiKey rỗng = không kiểm key (hợp với localhost).
+// New — apiKey rỗng = không kiểm key (chỉ hợp khi một mình bạn dùng máy).
 func New(router *provider.Router, apiKey string) *Server {
 	return &Server{router: router, apiKey: apiKey}
 }
@@ -76,13 +77,14 @@ func loopbackHost(hostport string) bool {
 	return strings.EqualFold(host, "localhost")
 }
 
-// authed — kiểm api-key nếu có đặt; localhost-only thì để trống là đủ.
+// authed — có đặt key thì đòi "Authorization: Bearer <key>" (scheme không
+// phân biệt hoa thường, RFC 7235); so key constant-time.
 func (s *Server) authed(w http.ResponseWriter, r *http.Request) bool {
 	if s.apiKey == "" {
 		return true
 	}
-	got := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
-	if got == s.apiKey {
+	f := strings.Fields(r.Header.Get("Authorization")) // scheme + token, cách nhau 1*SP/tab
+	if len(f) == 2 && strings.EqualFold(f[0], "Bearer") && subtle.ConstantTimeCompare([]byte(f[1]), []byte(s.apiKey)) == 1 {
 		return true
 	}
 	writeErr(w, http.StatusUnauthorized, "api key sai hoặc thiếu", "auth")
