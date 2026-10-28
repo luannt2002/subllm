@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 )
 
 func TestScanSSE(t *testing.T) {
@@ -139,5 +140,20 @@ func TestStreamSSEUpstreamError(t *testing.T) {
 		if !errors.As(err, &up) || up.Status != tc.status || up.RetryAfter != tc.want {
 			t.Fatalf("%s: muốn UpstreamError{%d, %v}, nhận %T %+v", tc.name, tc.status, tc.want, err, err)
 		}
+	}
+}
+
+// Truncate không được cắt đôi ký tự UTF-8 (thông báo lỗi tiếng Việt, "—"):
+// cắt giữa ký tự thì JSON của /status hiện "�".
+func TestTruncateUTF8(t *testing.T) {
+	s := "lỗi — đăng nhập lại"
+	for n := 0; n <= len(s); n++ {
+		got := Truncate([]byte(s), n)
+		if !utf8.ValidString(got) {
+			t.Fatalf("n=%d cắt đôi ký tự: %q", n, got)
+		}
+	}
+	if got := Truncate([]byte("abc"), 5); got != "abc" {
+		t.Fatalf("chuỗi ngắn hơn n phải giữ nguyên: %q", got)
 	}
 }

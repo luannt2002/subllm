@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 // Giới hạn an toàn bộ nhớ — không phải cấu hình triển khai.
@@ -82,9 +83,13 @@ func StreamSSE(client *http.Client, req *http.Request, label string,
 	})
 }
 
-// Truncate — cắt chuỗi byte dài để đưa vào thông báo lỗi.
+// Truncate — cắt chuỗi byte dài (tối đa n byte) để đưa vào thông báo lỗi,
+// lùi về đầu ký tự UTF-8 để không cắt đôi ký tự.
 func Truncate(b []byte, n int) string {
 	if len(b) > n {
+		for n > 0 && !utf8.RuneStart(b[n]) {
+			n--
+		}
 		return string(b[:n]) + "…"
 	}
 	return string(b)
