@@ -19,6 +19,11 @@ import (
 	"subllm/internal/provider"
 )
 
+// maxChatBody — trần body POST /v1/chat/completions: giới hạn an toàn bộ
+// nhớ (body đọc hết vào RAM), dư cho vài ảnh/PDF base64; không phải trần của
+// backend. Biến (không phải hằng) để test hạ xuống.
+var maxChatBody int64 = 64 << 20
+
 // Server — http.Handler phục vụ mặt OpenAI trên các provider của router.
 type Server struct {
 	router   *provider.Router
@@ -130,7 +135,12 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req provider.ChatRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxChatBody)).Decode(&req); err != nil {
+		var tooBig *http.MaxBytesError
+		if errors.As(err, &tooBig) {
+			writeErr(w, http.StatusRequestEntityTooLarge, fmt.Sprintf("body quá lớn (tối đa %d MiB)", maxChatBody>>20), "invalid_request_error")
+			return
+		}
 		writeErr(w, http.StatusBadRequest, "body JSON lỗi: "+err.Error(), "invalid_request_error")
 		return
 	}

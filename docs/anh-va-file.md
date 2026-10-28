@@ -114,4 +114,5 @@ một mã riêng (vd `JPG-5821`), script tự kiểm câu trả lời có chép 
   ảnh (bị bỏ qua, backend dùng mức mặc định).
 - Provider `claude`: đã có code + unit test, chưa chạy thật (429). File base64 ở
   Claude chỉ nhận PDF.
+- Trần body của một request: 64 MiB (base64 làm file to thêm khoảng 1/3) → quá thì 413.
 - Chưa thử: file lớn hơn 11 MB, file loại khác ngoài bảng trên.

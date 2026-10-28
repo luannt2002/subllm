@@ -95,7 +95,8 @@ SUBLLM_<K>                  chung cho mọi provider
   (file chỉ đích danh mà không có → lỗi). Host chỉ nhận loopback — code từ
   chối `0.0.0.0` / IP LAN.
 - Còn trong code, có chủ ý: hình dạng giao thức (path API, tên header, tên
-  field) và giới hạn an toàn bộ nhớ (`internal/provider/sse.go`).
+  field) và giới hạn an toàn bộ nhớ (`internal/provider/sse.go`, trần body chat
+  64 MiB ở `internal/server/server.go`).
 
 **Thêm gì thì sửa gì:**
 
@@ -129,7 +130,7 @@ khỏi lộ cho mọi user trên máy qua `ps`).
   không gửi = mặc định của model. Kiểu `claude` chưa hỗ trợ → 400 rõ ràng
   (không lặng lẽ bỏ qua). Lỗi trước khi có chữ đầu tiên trả
   mã HTTP thật, kể cả khi `stream: true`: 400 request sai (không dịch được, vd
-  role lạ, hoặc upstream trả 400), 404 không có provider, 429 + `Retry-After` (luôn có, lấy từ upstream
+  role lạ, hoặc upstream trả 400), 404 không có provider, 413 body quá 64 MiB, 429 + `Retry-After` (luôn có, lấy từ upstream
   hoặc `SUBLLM_COOLDOWN`), 502 còn lại; lỗi từ backend có thông báo mở đầu bằng
   tên provider đã thử cuối. Client huỷ giữa chừng hay request không dịch được không bị tính
   là lỗi của tài khoản trong `/status`; 400 từ upstream cũng vậy (request sai, tài

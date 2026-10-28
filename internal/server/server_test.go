@@ -139,6 +139,21 @@ func TestModelsNeedsKey(t *testing.T) {
 	}
 }
 
+// Body chat vượt trần → 413, không đọc hết vào RAM.
+func TestChatBodyTooLarge(t *testing.T) {
+	defer func(old int64) { maxChatBody = old }(maxChatBody)
+	maxChatBody = 64
+	s := New(provider.NewRouter(provider.Registry{&fake{id: "acc1", text: "chào"}}, time.Minute), "")
+	big := `{"model":"m-x","messages":[{"role":"user","content":"` + strings.Repeat("a", 100) + `"}]}`
+	if rec := call(t, s, "POST", "/v1/chat/completions", big); rec.Code != 413 || !strings.Contains(rec.Body.String(), "quá lớn") {
+		t.Fatalf("body vượt trần phải 413: %d %s", rec.Code, rec.Body)
+	}
+	small := `{"model":"m-x","messages":[{"role":"user","content":"hi"}]}`
+	if rec := call(t, s, "POST", "/v1/chat/completions", small); rec.Code != 200 {
+		t.Fatalf("body dưới trần phải 200: %d %s", rec.Code, rec.Body)
+	}
+}
+
 // spy — provider giả ghi lại request nhận được.
 type spy struct {
 	fake

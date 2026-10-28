@@ -115,6 +115,7 @@ thì `message` mở đầu bằng tên provider đã thử cuối.
 | 401 | `auth` | thiếu/sai API key | sửa key |
 | 404 | `model_not_found` | model không khớp tiền tố nào, hoặc `provider` không tồn tại | kiểm `GET /v1/models` / `GET /status` |
 | 405 | `invalid_request_error` | không dùng POST | dùng POST |
+| 413 | `invalid_request_error` | body quá 64 MiB (thường do nhiều ảnh/file base64) | thu nhỏ ảnh, tách bớt file sang request khác |
 | 429 | `rate_limit_error` | mọi tài khoản của nhóm đang dính hạn mức | chờ đúng `Retry-After` (giây, luôn có) rồi thử lại |
 | 502 | `upstream_error` | backend lỗi / mất mạng | thử lại vài lần có giãn cách; lặp lại thì xem log server |
 
