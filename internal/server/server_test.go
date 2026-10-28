@@ -34,7 +34,7 @@ func (f *fake) StreamChat(_ context.Context, _ provider.ChatRequest, emit func(p
 func call(t *testing.T, s *Server, method, path, body string) *httptest.ResponseRecorder {
 	t.Helper()
 	rec := httptest.NewRecorder()
-	s.ServeHTTP(rec, httptest.NewRequest(method, path, strings.NewReader(body)))
+	s.ServeHTTP(rec, httptest.NewRequest(method, "http://127.0.0.1"+path, strings.NewReader(body)))
 	return rec
 }
 
@@ -116,7 +116,7 @@ func TestStatusNeedsKey(t *testing.T) {
 		t.Fatalf("/status lộ tên tài khoản, có api key thì phải đòi: %d", rec.Code)
 	}
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest("GET", "/status", nil)
+	req := httptest.NewRequest("GET", "http://127.0.0.1/status", nil)
 	req.Header.Set("Authorization", "Bearer k")
 	s.ServeHTTP(rec, req)
 	if rec.Code != 200 || !strings.Contains(rec.Body.String(), `"name":"acc1"`) {
@@ -132,7 +132,7 @@ func TestModelsNeedsKey(t *testing.T) {
 		t.Fatalf("/v1/models có api key thì phải đòi: %d %s", rec.Code, rec.Body)
 	}
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest("GET", "/v1/models", nil)
+	req := httptest.NewRequest("GET", "http://127.0.0.1/v1/models", nil)
 	req.Header.Set("Authorization", "Bearer k")
 	s.ServeHTTP(rec, req)
 	if rec.Code != 200 || !strings.Contains(rec.Body.String(), `"owned_by":"acc1"`) {
@@ -200,6 +200,35 @@ func TestFinishReason(t *testing.T) {
 	}
 	if b := chat(&fake{id: "acc1", text: "đủ"}, "false"); !strings.Contains(b, `"finish_reason":"stop"`) {
 		t.Fatalf("bình thường phải stop: %s", b)
+	}
+}
+
+// Request từ trình duyệt (có Origin) hoặc qua tên miền lạ trỏ về 127.0.0.1
+// (DNS rebinding, Host lạ) → 403: không cần API key, một trang web cũng đã
+// tiêu được gói. Client cùng máy (curl, SDK) không gửi Origin.
+func TestRejectsBrowserAndForeignHost(t *testing.T) {
+	s := New(provider.NewRouter(provider.Registry{&fake{id: "acc1", text: "chào"}}, time.Minute), "")
+	body := `{"model":"m-x","messages":[{"role":"user","content":"x"}]}`
+	for _, tc := range []struct {
+		url, origin string
+		want        int
+	}{
+		{"http://127.0.0.1:18080/v1/chat/completions", "https://evil.example", 403},
+		{"http://evil.example:18080/v1/chat/completions", "", 403},
+		{"http://evil.example:18080/status", "", 403},
+		{"http://127.0.0.1:18080/v1/chat/completions", "", 200},
+		{"http://localhost:18080/v1/chat/completions", "", 200},
+		{"http://[::1]:18080/v1/chat/completions", "", 200},
+	} {
+		req := httptest.NewRequest("POST", tc.url, strings.NewReader(body))
+		if tc.origin != "" {
+			req.Header.Set("Origin", tc.origin)
+		}
+		rec := httptest.NewRecorder()
+		s.ServeHTTP(rec, req)
+		if rec.Code != tc.want {
+			t.Fatalf("%s origin=%q: muốn %d, nhận %d %s", tc.url, tc.origin, tc.want, rec.Code, rec.Body)
+		}
 	}
 }
 

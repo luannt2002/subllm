@@ -144,6 +144,9 @@ khỏi lộ cho mọi user trên máy qua `ps`).
   đụng credential, nên request không dịch được không kích refresh token.
 - `GET /status` — số đếm từng tài khoản (xem trên).
 - `GET /healthz`.
+- Mọi route: request có header `Origin` (trình duyệt) hoặc `Host` không phải
+  loopback → 403, để một trang web (kể cả qua DNS rebinding) không tiêu được
+  gói khi chưa đặt `SUBLLM_API_KEY`.
 
 ## Gọi thử
 

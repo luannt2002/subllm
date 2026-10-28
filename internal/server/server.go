@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -37,6 +38,13 @@ func New(router *provider.Router, apiKey string) *Server {
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// Trình duyệt (có Origin) hay tên miền lạ trỏ về 127.0.0.1 (DNS
+	// rebinding → Host lạ): chặn, kẻo một trang web tiêu được gói khi chưa
+	// đặt API key. Client cùng máy (curl, SDK) không gửi Origin.
+	if r.Header.Get("Origin") != "" || !loopbackHost(r.Host) {
+		writeErr(w, http.StatusForbidden, "subllm chỉ nhận request từ chương trình cùng máy (không Origin, Host là loopback)", "forbidden")
+		return
+	}
 	switch r.URL.Path {
 	case "/healthz":
 		w.WriteHeader(http.StatusOK)
@@ -50,6 +58,18 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	default:
 		writeErr(w, http.StatusNotFound, "route "+r.URL.Path+" không tồn tại", "not_found")
 	}
+}
+
+// loopbackHost — Host header là 127.0.0.1 / ::1 / localhost (có hoặc không port).
+func loopbackHost(hostport string) bool {
+	host, _, err := net.SplitHostPort(hostport)
+	if err != nil {
+		host = hostport
+	}
+	if ip := net.ParseIP(strings.Trim(host, "[]")); ip != nil {
+		return ip.IsLoopback()
+	}
+	return strings.EqualFold(host, "localhost")
 }
 
 // authed — kiểm api-key nếu có đặt; localhost-only thì để trống là đủ.
