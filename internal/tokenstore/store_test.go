@@ -202,3 +202,18 @@ func TestRefreshWritesThroughSymlink(t *testing.T) {
 		t.Fatalf("không được để sót tệp tạm: %v", left)
 	}
 }
+
+// Codex CLI để last_refresh ở GỐC file (đã đối chiếu file auth thật): ghi vào
+// trong tokens thì CLI vẫn thấy mốc cũ và tự refresh thêm, xoay token lần nữa.
+func TestLastRefreshAtRoot(t *testing.T) {
+	srv, _, _ := refreshServer(t, map[string]any{"access_token": jwtAt(time.Now().Add(time.Hour)), "refresh_token": "rt1"})
+	path := writeFile(t, `{"auth_mode":"chatgpt","last_refresh":"2020-01-01T00:00:00Z","tokens":{"access_token":"`+jwtAt(time.Now().Add(-time.Hour))+`","refresh_token":"rt0"}}`)
+	if _, err := codexStore(path, srv.URL).Get(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	doc, tok := readDoc(t, path)
+	at, err := time.Parse(time.RFC3339Nano, fmt.Sprint(doc["last_refresh"]))
+	if err != nil || time.Since(at) > time.Minute || tok["last_refresh"] != nil || doc["auth_mode"] != "chatgpt" {
+		t.Fatalf("last_refresh gốc phải là giờ refresh vừa rồi, không nằm trong tokens: gốc=%v tokens=%v", doc["last_refresh"], tok["last_refresh"])
+	}
+}

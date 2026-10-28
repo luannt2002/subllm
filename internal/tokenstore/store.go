@@ -38,8 +38,8 @@ type Store struct {
 	// ExpiresAtMsKey — field hạn tính bằng mili-giây (claude); rỗng nếu
 	// không dùng.
 	ExpiresAtMsKey string
-	// LastRefreshKey — field mốc thời gian refresh (codex); rỗng nếu không
-	// dùng.
+	// LastRefreshKey — field mốc thời gian refresh ở GỐC file (codex); rỗng
+	// nếu không dùng.
 	LastRefreshKey string
 	// RefreshURL — endpoint đổi refresh_token lấy token mới.
 	RefreshURL string
@@ -116,7 +116,7 @@ func (s *Store) Get(ctx context.Context) (Credentials, error) {
 		}
 	}
 	if s.LastRefreshKey != "" {
-		tok[s.LastRefreshKey] = time.Now().UTC().Format(time.RFC3339Nano)
+		doc[s.LastRefreshKey] = time.Now().UTC().Format(time.RFC3339Nano) // gốc file, như Codex CLI ghi
 	}
 	if err := s.save(doc, tok); err != nil {
 		return Credentials{}, fmt.Errorf("ghi ngược token vào %s: %w", s.Path, err)
