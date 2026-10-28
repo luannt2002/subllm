@@ -17,6 +17,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -161,13 +162,29 @@ func (s *Store) save(doc map[string]any, tok map[string]any) error {
 	if err != nil {
 		return err
 	}
-	tmp := s.Path + ".subllm-tmp"
-	if err := os.WriteFile(tmp, append(clean, '\n'), 0600); err != nil {
+	// Path là symlink (công cụ đổi tài khoản) thì ghi vào file thật: rename
+	// lên chính symlink sẽ thay nó bằng file thường, file thật giữ token chết.
+	path := s.Path
+	if real, err := filepath.EvalSymlinks(path); err == nil {
+		path = real
+	}
+	// Tệp tạm tên riêng mỗi lần (0600), cùng thư mục để rename là atomic.
+	f, err := os.CreateTemp(filepath.Dir(path), filepath.Base(path)+".subllm-*")
+	if err != nil {
+		return fmt.Errorf("tạo tệp tạm cạnh %s: %w", path, err)
+	}
+	tmp := f.Name()
+	_, err = f.Write(append(clean, '\n'))
+	if cerr := f.Close(); err == nil {
+		err = cerr
+	}
+	if err != nil {
+		os.Remove(tmp)
 		return fmt.Errorf("ghi tệp tạm %s: %w", tmp, err)
 	}
-	if err := os.Rename(tmp, s.Path); err != nil {
+	if err := os.Rename(tmp, path); err != nil {
 		os.Remove(tmp)
-		return fmt.Errorf("thay %s: %w", s.Path, err)
+		return fmt.Errorf("thay %s: %w", path, err)
 	}
 	return nil
 }

@@ -174,3 +174,31 @@ func TestRefreshSurvivesClientCancel(t *testing.T) {
 		t.Fatalf("server nhận %d refresh, file giữ refresh_token=%v (phải rt1)", n.Load(), tok["refresh_token"])
 	}
 }
+
+// File credential là symlink (công cụ đổi tài khoản trỏ auth.json sang file
+// của từng tài khoản): refresh phải ghi vào file thật và giữ nguyên symlink.
+func TestRefreshWritesThroughSymlink(t *testing.T) {
+	srv, _, _ := refreshServer(t, map[string]any{"access_token": jwtAt(time.Now().Add(time.Hour)), "refresh_token": "rt1"})
+	dir := t.TempDir()
+	real := filepath.Join(dir, "work.json")
+	if err := os.WriteFile(real, []byte(`{"tokens":{"access_token":"`+jwtAt(time.Now().Add(-time.Hour))+`","refresh_token":"rt0"}}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(dir, "auth.json")
+	if err := os.Symlink(real, link); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := codexStore(link, srv.URL).Get(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	fi, err := os.Lstat(link)
+	if err != nil || fi.Mode()&os.ModeSymlink == 0 {
+		t.Fatalf("symlink phải còn nguyên: %v %v", fi.Mode(), err)
+	}
+	if _, tok := readDoc(t, real); tok["refresh_token"] != "rt1" {
+		t.Fatalf("file thật phải có token mới, nhận refresh_token=%v", tok["refresh_token"])
+	}
+	if left, _ := filepath.Glob(filepath.Join(dir, "*subllm*")); len(left) != 0 {
+		t.Fatalf("không được để sót tệp tạm: %v", left)
+	}
+}
