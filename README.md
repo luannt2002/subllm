@@ -114,7 +114,7 @@ SUBLLM_<K>                  chung cho mọi provider
 cd subllm && go build -o bin/subllm .                 # cần Go ≥ 1.22
 cp -n .env.example .env && chmod 600 .env             # lần đầu, rồi điền các khoá 🔒
 (setsid ./bin/subllm > /tmp/subllm.log 2>&1 &)        # chạy nền (đọc .env ở thư mục hiện tại)
-SUBLLM_PORT=19000 ./bin/subllm                        # port khác mà không sửa .env
+SUBLLM_PORT=19000 ./bin/subllm                        # port khác mà không sửa .env — dừng bản kia trước
 pkill -f "[s]ubllm"                                   # dừng (dấu ngoặc chống tự khớp)
 ```
 
@@ -192,7 +192,15 @@ Python OpenAI SDK: `base_url="http://127.0.0.1:18080/v1"`, `api_key` = giá tr�
   0600) — CLI đọc cùng file thì hưởng token tươi. Hạn của token opaque lấy từ
   `expires_in` của phản hồi refresh.
 - `codex login` / `claude login` lại khi refresh bị từ chối (`/status` và log
-  ghi lỗi).
+  ghi lỗi). Refresh token đã bị từ chối (400/401/403) không được gửi lại cho
+  tới khi file có token khác, nên request sau báo lỗi ngay, không chờ mạng.
+- Refresh chạy đến cùng dù client đã huỷ request: server có thể đã đổi token,
+  bỏ dở là file giữ token chết. Refresh lỗi mà token cũ còn hạn → dùng tạm
+  token cũ (log ghi lại), request sau thử lại.
+- File credential là symlink → ghi vào file thật, symlink giữ nguyên.
+- **Mỗi file credential chỉ một tiến trình subllm.** Khoá refresh nằm trong
+  tiến trình: hai bản subllm (hoặc subllm + CLI) cùng refresh một token thì bản
+  sau bị từ chối. Muốn chạy bản thứ hai (port khác) thì dừng bản đang chạy.
 
 ## Giới hạn — đã test thật (23/10)
 
