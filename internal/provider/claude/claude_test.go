@@ -81,13 +81,17 @@ func TestClaudeEvent(t *testing.T) {
 	if err != nil || ev.Text != "chào" {
 		t.Fatalf("delta sai: %+v err=%v", ev, err)
 	}
-	ev, _ = decodeEvent([]byte(`{"type":"message_start","message":{"usage":{"input_tokens":7}}}`))
-	if ev.Usage == nil || ev.Usage.PromptTokens != 7 {
-		t.Fatalf("message_start usage sai: %+v", ev.Usage)
+	start, _ := decodeEvent([]byte(`{"type":"message_start","message":{"usage":{"input_tokens":7}}}`))
+	if start.Usage == nil || start.Usage.PromptTokens != 7 {
+		t.Fatalf("message_start usage sai: %+v", start.Usage)
 	}
 	ev, _ = decodeEvent([]byte(`{"type":"message_delta","usage":{"output_tokens":3}}`))
 	if ev.Usage == nil || ev.Usage.CompletionTokens != 3 {
 		t.Fatalf("message_delta usage sai: %+v", ev.Usage)
+	}
+	// server cộng dồn usage các sự kiện: total phải gồm cả output.
+	if sum := start.Usage.Add(*ev.Usage); sum.TotalTokens != 10 {
+		t.Fatalf("total_tokens phải 7+3=10, nhận %+v", sum)
 	}
 	ev, _ = decodeEvent([]byte(`{"type":"message_stop"}`))
 	if !ev.Done {
@@ -95,6 +99,10 @@ func TestClaudeEvent(t *testing.T) {
 	}
 	if _, err := decodeEvent([]byte(`{"type":"error","error":{"message":"rate limited"}}`)); err == nil {
 		t.Fatal("error event phải là lỗi")
+	}
+	// error event thiếu object "error": vẫn là lỗi, không được panic.
+	if _, err := decodeEvent([]byte(`{"type":"error"}`)); err == nil {
+		t.Fatal("error event không có object error vẫn phải là lỗi")
 	}
 }
 

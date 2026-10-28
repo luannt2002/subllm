@@ -196,10 +196,14 @@ func decodeEvent(data []byte) (provider.StreamEvent, error) {
 		u := ev.Message.Usage
 		return provider.StreamEvent{Usage: &provider.Usage{PromptTokens: u.InputTokens, TotalTokens: u.InputTokens}}, nil
 	case "message_delta":
-		return provider.StreamEvent{Usage: &provider.Usage{CompletionTokens: ev.Usage.OutputTokens}}, nil
+		out := ev.Usage.OutputTokens
+		return provider.StreamEvent{Usage: &provider.Usage{CompletionTokens: out, TotalTokens: out}}, nil
 	case "message_stop":
 		return provider.StreamEvent{Done: true}, nil
 	case "error":
+		if ev.Error == nil {
+			return provider.StreamEvent{}, fmt.Errorf("backend claude lỗi: %s", provider.Truncate(data, provider.ErrSnippet))
+		}
 		return provider.StreamEvent{}, fmt.Errorf("backend claude lỗi: %s", ev.Error.Message)
 	}
 	return provider.StreamEvent{}, nil
