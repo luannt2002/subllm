@@ -67,15 +67,25 @@ func (p *Provider) ID() string          { return p.cfg.Name }
 func (p *Provider) Match(m string) bool { return strings.HasPrefix(m, p.cfg.ModelPrefix) }
 
 // toItem — một tin nhắn OpenAI → một item Responses API.
-func toItem(role, text string) map[string]any {
-	textType := "input_text"
-	if role == "assistant" {
-		textType = "output_text"
+func toItem(role string, content []map[string]any) map[string]any {
+	return map[string]any{"type": "message", "role": role, "content": content}
+}
+
+// toContent — part của user → content Responses API (ảnh/file đã verify
+// live với data URI: backend đọc được cả hai).
+func toContent(parts []provider.Part) []map[string]any {
+	out := make([]map[string]any, 0, len(parts))
+	for _, p := range parts {
+		switch p.Type {
+		case provider.PartImage:
+			out = append(out, map[string]any{"type": "input_image", "image_url": p.URL})
+		case provider.PartFile:
+			out = append(out, map[string]any{"type": "input_file", "filename": p.Filename, "file_data": p.URL})
+		default:
+			out = append(out, map[string]any{"type": "input_text", "text": p.Text})
+		}
 	}
-	return map[string]any{
-		"type": "message", "role": role,
-		"content": []map[string]any{{"type": textType, "text": text}},
-	}
+	return out
 }
 
 // toPayload — dịch request OpenAI sang body Responses API. System messages
@@ -85,17 +95,28 @@ func toPayload(req provider.ChatRequest) (map[string]any, error) {
 	var instructions []string
 	var input []map[string]any
 	for i, m := range req.Messages {
-		text, err := m.ContentText()
-		if err != nil {
-			return nil, fmt.Errorf("messages[%d]: %w", i, err)
-		}
+		var err error
 		switch m.Role {
 		case "system", "developer":
-			instructions = append(instructions, text)
-		case "user", "assistant":
-			input = append(input, toItem(m.Role, text))
+			var text string
+			if text, err = m.ContentText(); err == nil {
+				instructions = append(instructions, text)
+			}
+		case "assistant":
+			var text string
+			if text, err = m.ContentText(); err == nil {
+				input = append(input, toItem(m.Role, []map[string]any{{"type": "output_text", "text": text}}))
+			}
+		case "user":
+			var parts []provider.Part
+			if parts, err = m.Parts(); err == nil {
+				input = append(input, toItem(m.Role, toContent(parts)))
+			}
 		default:
-			return nil, fmt.Errorf("messages[%d]: role %q không dùng được với backend Codex", i, m.Role)
+			err = fmt.Errorf("role %q không dùng được với backend Codex", m.Role)
+		}
+		if err != nil {
+			return nil, fmt.Errorf("messages[%d]: %w", i, err)
 		}
 	}
 	payload := map[string]any{

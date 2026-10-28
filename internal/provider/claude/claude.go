@@ -68,9 +68,46 @@ func New(cfg Config) *Provider {
 func (p *Provider) ID() string          { return p.cfg.Name }
 func (p *Provider) Match(m string) bool { return strings.HasPrefix(m, p.cfg.ModelPrefix) }
 
+// source — nguồn của block image/document: data URI → base64, còn lại → url.
+func source(u string) (map[string]any, error) {
+	rest, isData := strings.CutPrefix(u, "data:")
+	if !isData {
+		return map[string]any{"type": "url", "url": u}, nil
+	}
+	mediaType, data, ok := strings.Cut(rest, ";base64,")
+	if !ok {
+		return nil, fmt.Errorf("data URI phải dạng data:<media-type>;base64,<dữ liệu>")
+	}
+	mediaType, _, _ = strings.Cut(mediaType, ";") // bỏ tham số (charset, name…): Anthropic chỉ nhận media type trần
+	return map[string]any{"type": "base64", "media_type": mediaType, "data": data}, nil
+}
+
+// toBlocks — part của user → content block Messages API.
+func toBlocks(parts []provider.Part) ([]map[string]any, error) {
+	out := make([]map[string]any, 0, len(parts))
+	for _, p := range parts {
+		if p.Type == provider.PartText {
+			if p.Text != "" { // Messages API trả 400 với block text rỗng (client gửi ảnh không kèm chữ)
+				out = append(out, map[string]any{"type": "text", "text": p.Text})
+			}
+			continue
+		}
+		src, err := source(p.URL)
+		if err != nil {
+			return nil, err
+		}
+		blockType := "image"
+		if p.Type == provider.PartFile {
+			blockType = "document"
+		}
+		out = append(out, map[string]any{"type": blockType, "source": src})
+	}
+	return out, nil
+}
+
 // toPayload — dịch request OpenAI sang body messages của Anthropic: system
-// messages gộp thành "system", còn lại giữ vai; content gửi dạng string vì
-// client của ta chỉ có text.
+// messages gộp thành "system", còn lại giữ vai; user gửi dạng mảng block
+// (text/image/document), assistant gửi string.
 func (p *Provider) toPayload(req provider.ChatRequest) (map[string]any, error) {
 	if req.ReasoningEffort != "" {
 		// Messages API điều khiển suy nghĩ bằng cơ chế khác; chưa dịch thì
@@ -80,17 +117,31 @@ func (p *Provider) toPayload(req provider.ChatRequest) (map[string]any, error) {
 	var system []string
 	var messages []map[string]any
 	for i, m := range req.Messages {
-		text, err := m.ContentText()
-		if err != nil {
-			return nil, fmt.Errorf("messages[%d]: %w", i, err)
-		}
+		var err error
 		switch m.Role {
 		case "system", "developer":
-			system = append(system, text)
-		case "user", "assistant":
-			messages = append(messages, map[string]any{"role": m.Role, "content": text})
+			var text string
+			if text, err = m.ContentText(); err == nil {
+				system = append(system, text)
+			}
+		case "assistant":
+			var text string
+			if text, err = m.ContentText(); err == nil {
+				messages = append(messages, map[string]any{"role": m.Role, "content": text})
+			}
+		case "user":
+			var parts []provider.Part
+			if parts, err = m.Parts(); err == nil {
+				var blocks []map[string]any
+				if blocks, err = toBlocks(parts); err == nil {
+					messages = append(messages, map[string]any{"role": m.Role, "content": blocks})
+				}
+			}
 		default:
-			return nil, fmt.Errorf("messages[%d]: role %q không dùng được với backend Claude", i, m.Role)
+			err = fmt.Errorf("role %q không dùng được với backend Claude", m.Role)
+		}
+		if err != nil {
+			return nil, fmt.Errorf("messages[%d]: %w", i, err)
 		}
 	}
 	maxTokens := p.cfg.MaxTokens

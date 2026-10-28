@@ -43,6 +43,39 @@ func TestChatToClaudePayload(t *testing.T) {
 	}
 }
 
+// Part ảnh/file của OpenAI → block image/document của Messages API: data URI
+// thành nguồn base64, URL thành nguồn url.
+func TestClaudeMultimodalPayload(t *testing.T) {
+	p := New(Config{MaxTokens: 1})
+	req := provider.ChatRequest{Model: "pb-model", Messages: []provider.ChatMessage{{Role: "user", Content: json.RawMessage(`[
+		{"type":"text","text":"so sánh"},
+		{"type":"text","text":""},
+		{"type":"image_url","image_url":{"url":"data:image/png;base64,AAA"}},
+		{"type":"image_url","image_url":{"url":"https://x/b.jpg"}},
+		{"type":"file","file":{"filename":"a.pdf","file_data":"data:application/pdf;name=a.pdf;base64,BBB"}}]`)}}}
+	payload, err := p.toPayload(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, _ := json.Marshal(payload["messages"].([]map[string]any)[0]["content"])
+	exp := `[{"text":"so sánh","type":"text"},` +
+		`{"source":{"data":"AAA","media_type":"image/png","type":"base64"},"type":"image"},` +
+		`{"source":{"type":"url","url":"https://x/b.jpg"},"type":"image"},` +
+		`{"source":{"data":"BBB","media_type":"application/pdf","type":"base64"},"type":"document"}]`
+	if string(got) != exp {
+		t.Fatalf("content sai:\n nhận %s\n muốn %s", got, exp)
+	}
+	req.Messages[0].Role = "system" // system chỉ nhận chữ
+	if _, err := p.toPayload(req); err == nil {
+		t.Fatal("ảnh trong system phải lỗi")
+	}
+	req.Messages[0].Role = "user"
+	req.Messages[0].Content = json.RawMessage(`[{"type":"image_url","image_url":{"url":"data:image/png,AAA"}}]`)
+	if _, err := p.toPayload(req); err == nil {
+		t.Fatal("data URI không base64 phải lỗi")
+	}
+}
+
 func TestClaudeEvent(t *testing.T) {
 	ev, err := decodeEvent([]byte(`{"type":"content_block_delta","delta":{"type":"text_delta","text":"chào"}}`))
 	if err != nil || ev.Text != "chào" {

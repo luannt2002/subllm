@@ -146,6 +146,16 @@ curl http://127.0.0.1:18080/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{"model": "<model>", "reasoning_effort": "<mức>", "messages": [{"role": "user", "content": "Xin chào"}]}'
 
+# ảnh + file: content là mảng part chuẩn OpenAI, một lượt trộn được nhiều
+# text / ảnh (data URI base64 hoặc URL) / file (data URI base64, vd PDF)
+curl http://127.0.0.1:18080/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{"model": "<model>", "messages": [{"role": "user", "content": [
+        {"type": "text", "text": "Câu 1: ảnh có gì?"},
+        {"type": "image_url", "image_url": {"url": "data:image/png;base64,<...>"}},
+        {"type": "text", "text": "Câu 2: file này là hợp đồng số mấy?"},
+        {"type": "file", "file": {"filename": "a.pdf", "file_data": "data:application/pdf;base64,<...>"}}]}]}'
+
 # chọn provider (tài khoản) đích danh
 curl http://127.0.0.1:18080/v1/chat/completions \
   -H "Content-Type: application/json" \
@@ -178,6 +188,11 @@ Python OpenAI SDK: `base_url="http://127.0.0.1:18080/v1"`, `api_key` = giá tr�
   `/v1/embeddings` và `/v1/rerank` đều 404 (chưa từng có). Embedding cho RAG
   phải lấy nơi khác: OpenAI API trả tiền, Voyage (nhà Anthropic khuyên),
   Jina, Cohere rerank, hoặc model local.
+- **Đầu vào: text, ảnh, file** (part `text` · `image_url` · `file` với
+  `file_data`); part khác (`input_audio`, `file_id`…) → 400, không lặng lẽ bỏ.
+  Codex đã test thật 27/10 (2 ảnh + 1 PDF một lượt); Claude mới có unit test
+  (tài khoản đang 429), và file base64 ở Claude chỉ nhận PDF. Cách dùng + bảng
+  loại file đã thử: [docs/anh-va-file.md](docs/anh-va-file.md).
 - **Không tools/function calling**: chỉ text out, đủ cho RAG dev
   (agent cần tool chưa dùng subllm làm model chính được).
 - **Kiểu `claude` là thử nghiệm**: đọc token và `/v1/models` chạy, nhưng chat

@@ -44,6 +44,39 @@ func TestChatToCodexPayload(t *testing.T) {
 	if input[1]["role"] != "assistant" {
 		t.Fatalf("item hai phải assistant, nhận %v", input[1]["role"])
 	}
+	if c := input[1]["content"].([]map[string]any); c[0]["type"] != "output_text" || c[0]["text"] != "Chào bạn" {
+		t.Fatalf("assistant phải output_text giữ nguyên chữ, nhận %v", c)
+	}
+}
+
+// Part ảnh/file của OpenAI → input_image/input_file của Responses API, giữ thứ tự.
+func TestCodexMultimodalPayload(t *testing.T) {
+	req := provider.ChatRequest{Model: "pa-model", Messages: []provider.ChatMessage{{Role: "user", Content: json.RawMessage(`[
+		{"type":"text","text":"so sánh"},
+		{"type":"image_url","image_url":{"url":"data:image/png;base64,AAA"}},
+		{"type":"image_url","image_url":{"url":"https://x/b.jpg"}},
+		{"type":"file","file":{"filename":"a.pdf","file_data":"data:application/pdf;base64,BBB"}}]`)}}}
+	payload, err := toPayload(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	content := payload["input"].([]map[string]any)[0]["content"].([]map[string]any)
+	want := []map[string]any{
+		{"type": "input_text", "text": "so sánh"},
+		{"type": "input_image", "image_url": "data:image/png;base64,AAA"},
+		{"type": "input_image", "image_url": "https://x/b.jpg"},
+		{"type": "input_file", "filename": "a.pdf", "file_data": "data:application/pdf;base64,BBB"},
+	}
+	got, _ := json.Marshal(content)
+	exp, _ := json.Marshal(want)
+	if string(got) != string(exp) {
+		t.Fatalf("content sai:\n nhận %s\n muốn %s", got, exp)
+	}
+	// system chỉ nhận chữ: ảnh ở system phải 400, không lặng lẽ bỏ.
+	req.Messages[0].Role = "system"
+	if _, err := toPayload(req); err == nil {
+		t.Fatal("ảnh trong system phải lỗi")
+	}
 }
 
 func TestCodexEvent(t *testing.T) {
