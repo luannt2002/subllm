@@ -2,6 +2,10 @@
 
 *Một binary Go, zero dependency (chỉ stdlib).*
 
+Viết ứng dụng gọi vào subllm: [docs/tich-hop-ung-dung.md](docs/tich-hop-ung-dung.md)
+(từng luồng: text, hội thoại, stream, ảnh/file, lỗi). Ảnh và file:
+[docs/anh-va-file.md](docs/anh-va-file.md).
+
 subllm mở API tương thích OpenAI trên `<SUBLLM_HOST>:<SUBLLM_PORT>` (mẫu
 `127.0.0.1:18080`), đi qua gói đăng ký (subscription) của bạn. Mỗi
 **provider** là **một tài khoản** của một **kiểu** (giao thức) mà code biết nói:
@@ -194,7 +198,9 @@ Python OpenAI SDK: `base_url="http://127.0.0.1:18080/v1"`, `api_key` = giá tr�
   (tài khoản đang 429), và file base64 ở Claude chỉ nhận PDF. Cách dùng + bảng
   loại file đã thử: [docs/anh-va-file.md](docs/anh-va-file.md).
 - **Không tools/function calling**: chỉ text out, đủ cho RAG dev
-  (agent cần tool chưa dùng subllm làm model chính được).
+  (agent cần tool chưa dùng subllm làm model chính được). Field `tools`,
+  `temperature`… bị bỏ qua không báo lỗi — danh sách đã đo ở mục 9 của
+  [docs/tich-hop-ung-dung.md](docs/tich-hop-ung-dung.md).
 - **Kiểu `claude` là thử nghiệm**: đọc token và `/v1/models` chạy, nhưng chat
   (`/messages`) với tài khoản thử từ 26/10 luôn nhận 429 `rate_limit_error`
   không kèm header hạn mức, kể cả tài khoản không có phiên Claude Code nào
