@@ -5,7 +5,7 @@ cấu hình phía server xem [README](../README.md).
 
 subllm nói đúng giao thức OpenAI chat completions, nên client OpenAI nào cũng
 dùng được: đổi base URL là xong. Dưới đây là từng luồng, kèm hành vi đã đo thật
-ngày 28/10 trên provider kiểu `codex`.
+(10/2026) trên provider kiểu `codex`.
 
 ## 0. Kết nối
 

@@ -35,7 +35,7 @@ text: gửi ảnh vào đó → 400.
 }
 ```
 
-Kết quả chạy 28/10: HTTP 200, *"Câu 1: 1 + 1 = 2. Câu 2: Đây là logo Python."*
+Kết quả chạy thật (10/2026): HTTP 200, *"Câu 1: 1 + 1 = 2. Câu 2: Đây là logo Python."*
 
 ## Ví dụ 2 — gửi file có sẵn trên máy (ảnh, PDF, Word, Excel…)
 
@@ -61,7 +61,7 @@ EOF
 
 Muốn stream thì thêm `"stream": true` vào body, ảnh/file vẫn chạy như thường.
 
-## Loại nào chạy được — bảng thử 28/10
+## Loại nào chạy được — bảng thử (10/2026)
 
 Thử qua `127.0.0.1:18080`, provider kiểu `codex`. Mỗi file chứa
 một mã riêng (vd `JPG-5821`), script tự kiểm câu trả lời có chép đúng mã không.
@@ -86,7 +86,7 @@ một mã riêng (vd `JPG-5821`), script tự kiểm câu trả lời có chép 
 | ảnh bằng link Wikimedia | ❌ backend không tải được link (Wikimedia chặn) | — | — |
 | chỉ text, 2 câu trong một tin nhắn | ✅ | 36 | 1,6 s |
 | tài khoản Codex thứ hai + ảnh + PDF | ✅ | — | — |
-| provider `claude` + ảnh | ❌ chưa thử được: tài khoản Claude đang 429 | — | — |
+| provider `claude` + ảnh | ❌ chưa thử được: chat kiểu `claude` đang nhận 429 (xem README) | — | — |
 
 ## Mẹo
 
