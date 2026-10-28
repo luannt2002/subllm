@@ -93,7 +93,9 @@ func (s *Store) Get(ctx context.Context) (Credentials, error) {
 	if refreshTok == "" {
 		return Credentials{}, fmt.Errorf("token sắp hết hạn mà không có %s — login lại bằng CLI", s.RefreshKey)
 	}
-	fresh, err := s.refresh(ctx, refreshTok)
+	// Không huỷ theo client: server OAuth có thể đã xoay token, bỏ phản hồi là
+	// file giữ refresh token đã chết. Thời gian vẫn bị chặn bởi timeout refresh.
+	fresh, err := s.refresh(context.WithoutCancel(ctx), refreshTok)
 	if err != nil {
 		return Credentials{}, err
 	}

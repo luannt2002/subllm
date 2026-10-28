@@ -127,3 +127,50 @@ func TestRefreshRejected(t *testing.T) {
 }
 
 func base64URL(b []byte) string { return base64.RawURLEncoding.EncodeToString(b) }
+
+// jwtAt — access token dạng JWT hết hạn lúc exp (chỉ claim exp, không ký).
+func jwtAt(exp time.Time) string {
+	p, _ := json.Marshal(map[string]any{"exp": exp.Unix()})
+	return "h." + base64URL(p) + ".s"
+}
+
+// codexStore — cấu hình như provider kiểu codex (JWT + account_id + last_refresh).
+func codexStore(path, refreshURL string) *Store {
+	s := New(path, "tokens", 5*time.Minute, 5*time.Second)
+	s.AccessKey, s.RefreshKey, s.AccountKey, s.LastRefreshKey = "access_token", "refresh_token", "account_id", "last_refresh"
+	s.RefreshURL, s.ClientID = refreshURL, "cid"
+	return s
+}
+
+// readDoc — đọc lại file credential sau khi Store ghi.
+func readDoc(t *testing.T, path string) (doc, tok map[string]any) {
+	t.Helper()
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(raw, &doc); err != nil {
+		t.Fatalf("file không phải JSON: %v", err)
+	}
+	return doc, doc["tokens"].(map[string]any)
+}
+
+// Client huỷ request lúc đang refresh: server OAuth đã nhận refresh token cũ
+// (đã xoay) nên subllm vẫn phải nhận phản hồi và ghi token mới, không thì
+// file giữ token đã chết → mất đăng nhập.
+func TestRefreshSurvivesClientCancel(t *testing.T) {
+	var n atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		n.Add(1)
+		time.Sleep(200 * time.Millisecond)
+		json.NewEncoder(w).Encode(map[string]any{"access_token": jwtAt(time.Now().Add(time.Hour)), "refresh_token": "rt1"})
+	}))
+	defer srv.Close()
+	path := writeFile(t, `{"tokens":{"access_token":"`+jwtAt(time.Now().Add(-time.Hour))+`","refresh_token":"rt0"}}`)
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+	defer cancel()
+	codexStore(path, srv.URL).Get(ctx)
+	if _, tok := readDoc(t, path); n.Load() != 1 || tok["refresh_token"] != "rt1" {
+		t.Fatalf("server nhận %d refresh, file giữ refresh_token=%v (phải rt1)", n.Load(), tok["refresh_token"])
+	}
+}
