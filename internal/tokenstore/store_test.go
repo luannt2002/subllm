@@ -234,3 +234,40 @@ func TestRefreshFailsTokenStillValid(t *testing.T) {
 		t.Fatal("token đã hết hạn mà refresh lỗi thì phải lỗi")
 	}
 }
+
+// Server đã từ chối một refresh token (vd bị thu hồi): request sau không gửi
+// lại token đó (không tốn vòng mạng, không giữ khoá chờ), cho tới khi file có
+// token khác (login lại). 429/5xx là lỗi tạm: vẫn thử lại.
+func TestRejectedRefreshTokenNotResent(t *testing.T) {
+	status := http.StatusBadRequest
+	var n atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		n.Add(1)
+		w.WriteHeader(status)
+		fmt.Fprint(w, `{"error":"invalid_grant"}`)
+	}))
+	defer srv.Close()
+	expired := `{"tokens":{"access_token":"` + jwtAt(time.Now().Add(-time.Hour)) + `","refresh_token":"%s"}}`
+	path := writeFile(t, fmt.Sprintf(expired, "rt0"))
+	s := codexStore(path, srv.URL)
+	for i := 0; i < 3; i++ {
+		if _, err := s.Get(context.Background()); err == nil {
+			t.Fatal("refresh bị từ chối phải lỗi")
+		}
+	}
+	if n.Load() != 1 {
+		t.Fatalf("token đã bị từ chối không được gửi lại: server nhận %d lần", n.Load())
+	}
+	os.WriteFile(path, []byte(fmt.Sprintf(expired, "rt-login-lai")), 0600) // login lại
+	s.Get(context.Background())
+	if n.Load() != 2 {
+		t.Fatalf("file có token mới thì phải refresh lại: server nhận %d lần", n.Load())
+	}
+	status = http.StatusTooManyRequests // lỗi tạm: không được nhớ
+	os.WriteFile(path, []byte(fmt.Sprintf(expired, "rt-429")), 0600)
+	s.Get(context.Background())
+	s.Get(context.Background())
+	if n.Load() != 4 {
+		t.Fatalf("429 là lỗi tạm, phải thử lại: server nhận %d lần (muốn 4)", n.Load())
+	}
+}

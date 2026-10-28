@@ -11,6 +11,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -50,8 +51,17 @@ type Store struct {
 	// Margin — token còn hạn dưới mức này thì refresh trước.
 	Margin time.Duration
 
-	mu     sync.Mutex // một file credential, một khóa
-	client *http.Client
+	mu       sync.Mutex // một file credential, một khóa
+	client   *http.Client
+	rejected string // refresh token server đã từ chối hẳn: không gửi lại
+}
+
+// rejectedError — server OAuth từ chối hẳn refresh token (400/401/403, vd bị
+// thu hồi): thử lại vô ích, phải login lại. 429/5xx/mạng là lỗi tạm.
+type rejectedError struct{ status int }
+
+func (e *rejectedError) Error() string {
+	return fmt.Sprintf("refresh bị từ chối (HTTP %d) — login lại bằng CLI", e.status)
 }
 
 // New — Store cho file path, token nằm ở object tokenAt; refresh trước khi
@@ -94,9 +104,20 @@ func (s *Store) Get(ctx context.Context) (Credentials, error) {
 	if refreshTok == "" {
 		return Credentials{}, fmt.Errorf("token sắp hết hạn mà không có %s — login lại bằng CLI", s.RefreshKey)
 	}
-	// Không huỷ theo client: server OAuth có thể đã xoay token, bỏ phản hồi là
-	// file giữ refresh token đã chết. Thời gian vẫn bị chặn bởi timeout refresh.
-	fresh, err := s.refresh(context.WithoutCancel(ctx), refreshTok)
+	var fresh refreshedToken
+	if refreshTok == s.rejected {
+		// Server đã từ chối đúng token này: gửi lại chỉ tốn một vòng mạng trong
+		// lúc giữ khoá. Login lại thì file có token khác → refresh bình thường.
+		err = fmt.Errorf("refresh token trong %s đã bị từ chối — login lại bằng CLI", s.Path)
+	} else {
+		// Không huỷ theo client: server OAuth có thể đã xoay token, bỏ phản hồi
+		// là file giữ refresh token đã chết. Vẫn bị chặn bởi timeout refresh.
+		fresh, err = s.refresh(context.WithoutCancel(ctx), refreshTok)
+		var rej *rejectedError
+		if errors.As(err, &rej) {
+			s.rejected = refreshTok
+		}
+	}
 	if err != nil {
 		if expErr == nil && time.Until(expiry) > 0 {
 			// Token hiện tại còn hạn: dùng tạm, request sau thử refresh lại.
@@ -242,6 +263,10 @@ func (s *Store) refresh(ctx context.Context, refreshToken string) (refreshedToke
 		return refreshedToken{}, fmt.Errorf("gọi %s: %w", s.RefreshURL, err)
 	}
 	defer resp.Body.Close()
+	switch resp.StatusCode {
+	case http.StatusBadRequest, http.StatusUnauthorized, http.StatusForbidden:
+		return refreshedToken{}, &rejectedError{status: resp.StatusCode}
+	}
 	var out struct {
 		AccessToken  string `json:"access_token"`
 		RefreshToken string `json:"refresh_token"`
