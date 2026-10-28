@@ -19,7 +19,7 @@ func TestChatToClaudePayload(t *testing.T) {
 			{Role: "user", Content: json.RawMessage(`"Hi"`)},
 		},
 	}
-	p := New(Config{MaxTokens: 1234}) // khác hằng 4096 cũ: chứng minh đọc từ Config
+	p := New(Config{MaxTokens: 1234}) // giá trị lạ: chứng minh đọc từ Config, không phải hằng
 	payload, err := p.toPayload(req)
 	if err != nil {
 		t.Fatalf("toPayload lỗi: %v", err)

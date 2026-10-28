@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -23,8 +24,7 @@ func refreshServer(t *testing.T, resp map[string]any) (*httptest.Server, *atomic
 	var bodies []string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		n.Add(1)
-		raw := make([]byte, r.ContentLength)
-		r.Body.Read(raw)
+		raw, _ := io.ReadAll(r.Body)
 		bodies = append(bodies, r.Header.Get("Content-Type")+" "+string(raw))
 		json.NewEncoder(w).Encode(resp)
 	}))
@@ -49,7 +49,7 @@ func claudeStore(path, refreshURL string) *Store {
 	return s
 }
 
-// P1: token opaque (không phải JWT) → hạn mới phải lấy từ expires_in của
+// Token opaque (không phải JWT) → hạn mới phải lấy từ expires_in của
 // phản hồi refresh; nếu không, mọi lần Get sau lại refresh (xoay refresh
 // token liên tục, giẫm lên các phiên CLI dùng chung file).
 func TestRefreshOpaqueTokenOnlyOnce(t *testing.T) {
@@ -89,19 +89,12 @@ func TestRefreshOpaqueTokenOnlyOnce(t *testing.T) {
 	}
 }
 
-// P2: phản hồi refresh không có account_id → request kích refresh vẫn phải
+// Phản hồi refresh không có account_id → request kích refresh vẫn phải
 // mang account_id đang có trong file.
 func TestRefreshKeepsAccountID(t *testing.T) {
-	jwt := func(exp time.Time) string {
-		p, _ := json.Marshal(map[string]any{"exp": exp.Unix()})
-		return "h." + base64URL(p) + ".s"
-	}
-	path := writeFile(t, `{"tokens":{"access_token":"`+jwt(time.Now().Add(-time.Hour))+`","refresh_token":"rt0","account_id":"acc-1"}}`)
-	srv, _, bodies := refreshServer(t, map[string]any{"access_token": jwt(time.Now().Add(time.Hour)), "refresh_token": "rt1"})
-	s := New(path, "tokens", 5*time.Minute, 5*time.Second)
-	s.AccessKey, s.RefreshKey, s.AccountKey, s.LastRefreshKey = "access_token", "refresh_token", "account_id", "last_refresh"
-	s.RefreshURL, s.ClientID = srv.URL, "cid"
-	c, err := s.Get(context.Background())
+	path := writeFile(t, `{"tokens":{"access_token":"`+jwtAt(time.Now().Add(-time.Hour))+`","refresh_token":"rt0","account_id":"acc-1"}}`)
+	srv, _, bodies := refreshServer(t, map[string]any{"access_token": jwtAt(time.Now().Add(time.Hour)), "refresh_token": "rt1"})
+	c, err := codexStore(path, srv.URL).Get(context.Background())
 	if err != nil || c.AccountID != "acc-1" {
 		t.Fatalf("request kích refresh phải giữ AccountID=acc-1, nhận %+v %v", c, err)
 	}
@@ -181,12 +174,12 @@ func TestRefreshSurvivesClientCancel(t *testing.T) {
 func TestRefreshWritesThroughSymlink(t *testing.T) {
 	srv, _, _ := refreshServer(t, map[string]any{"access_token": jwtAt(time.Now().Add(time.Hour)), "refresh_token": "rt1"})
 	dir := t.TempDir()
-	real := filepath.Join(dir, "work.json")
-	if err := os.WriteFile(real, []byte(`{"tokens":{"access_token":"`+jwtAt(time.Now().Add(-time.Hour))+`","refresh_token":"rt0"}}`), 0600); err != nil {
+	target := filepath.Join(dir, "work.json")
+	if err := os.WriteFile(target, []byte(`{"tokens":{"access_token":"`+jwtAt(time.Now().Add(-time.Hour))+`","refresh_token":"rt0"}}`), 0600); err != nil {
 		t.Fatal(err)
 	}
 	link := filepath.Join(dir, "auth.json")
-	if err := os.Symlink(real, link); err != nil {
+	if err := os.Symlink(target, link); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := codexStore(link, srv.URL).Get(context.Background()); err != nil {
@@ -196,7 +189,7 @@ func TestRefreshWritesThroughSymlink(t *testing.T) {
 	if err != nil || fi.Mode()&os.ModeSymlink == 0 {
 		t.Fatalf("symlink phải còn nguyên: %v %v", fi.Mode(), err)
 	}
-	if _, tok := readDoc(t, real); tok["refresh_token"] != "rt1" {
+	if _, tok := readDoc(t, target); tok["refresh_token"] != "rt1" {
 		t.Fatalf("file thật phải có token mới, nhận refresh_token=%v", tok["refresh_token"])
 	}
 	if left, _ := filepath.Glob(filepath.Join(dir, "*subllm*")); len(left) != 0 {
@@ -208,7 +201,7 @@ func TestRefreshWritesThroughSymlink(t *testing.T) {
 // trong tokens thì CLI vẫn thấy mốc cũ và tự refresh thêm, xoay token lần nữa.
 func TestLastRefreshAtRoot(t *testing.T) {
 	srv, _, _ := refreshServer(t, map[string]any{"access_token": jwtAt(time.Now().Add(time.Hour)), "refresh_token": "rt1"})
-	path := writeFile(t, `{"auth_mode":"chatgpt","last_refresh":"2020-01-01T00:00:00Z","tokens":{"access_token":"`+jwtAt(time.Now().Add(-time.Hour))+`","refresh_token":"rt0","last_refresh":"bản cũ ghi nhầm"}}`)
+	path := writeFile(t, `{"auth_mode":"chatgpt","last_refresh":"2020-01-01T00:00:00Z","tokens":{"access_token":"`+jwtAt(time.Now().Add(-time.Hour))+`","refresh_token":"rt0"}}`)
 	if _, err := codexStore(path, srv.URL).Get(context.Background()); err != nil {
 		t.Fatal(err)
 	}

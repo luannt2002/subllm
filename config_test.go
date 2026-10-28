@@ -13,7 +13,7 @@ import (
 func isolateEnv(t *testing.T) {
 	t.Helper()
 	saved := map[string]string{}
-	clear := func() {
+	unsetAll := func() {
 		for _, kv := range os.Environ() {
 			if k, _, _ := strings.Cut(kv, "="); strings.HasPrefix(k, "SUBLLM_") {
 				os.Unsetenv(k)
@@ -25,9 +25,9 @@ func isolateEnv(t *testing.T) {
 			saved[k] = v
 		}
 	}
-	clear()
+	unsetAll()
 	t.Cleanup(func() {
-		clear()
+		unsetAll()
 		for k, v := range saved {
 			os.Setenv(k, v)
 		}
@@ -231,14 +231,14 @@ func TestConfigMultiAccount(t *testing.T) {
 // tuyệt đối, qua symlink tới file, qua thư mục cha là symlink khi file chưa có.
 func TestConfigDuplicateCredFileSpellings(t *testing.T) {
 	dir := t.TempDir()
-	real := filepath.Join(dir, "acc.json")
-	if err := os.WriteFile(real, []byte("{}"), 0600); err != nil {
+	target := filepath.Join(dir, "acc.json")
+	if err := os.WriteFile(target, []byte("{}"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Symlink(real, filepath.Join(dir, "link.json")); err != nil {
+	if err := os.Symlink(target, filepath.Join(dir, "link.json")); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Link(real, filepath.Join(dir, "hard.json")); err != nil {
+	if err := os.Link(target, filepath.Join(dir, "hard.json")); err != nil {
 		t.Fatal(err)
 	}
 	linkDir := filepath.Join(t.TempDir(), "via")
@@ -246,10 +246,10 @@ func TestConfigDuplicateCredFileSpellings(t *testing.T) {
 		t.Fatal(err)
 	}
 	for name, pair := range map[string][2]string{
-		"tương đối vs tuyệt đối":               {"acc.json", real},
+		"tương đối vs tuyệt đối":               {"acc.json", target},
 		"tương đối vs tuyệt đối, file chưa có": {"chua-co.json", filepath.Join(dir, "chua-co.json")},
-		"symlink tới file":                     {filepath.Join(dir, "link.json"), real},
-		"hard link":                            {filepath.Join(dir, "hard.json"), real},
+		"symlink tới file":                     {filepath.Join(dir, "link.json"), target},
+		"hard link":                            {filepath.Join(dir, "hard.json"), target},
 		"thư mục cha symlink, file mới":        {filepath.Join(linkDir, "moi.json"), filepath.Join(dir, "moi.json")},
 	} {
 		t.Run(name, func(t *testing.T) {

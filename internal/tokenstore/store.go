@@ -165,7 +165,6 @@ func (s *Store) Get(ctx context.Context) (Credentials, error) {
 	}
 	if s.LastRefreshKey != "" {
 		doc[s.LastRefreshKey] = time.Now().UTC().Format(time.RFC3339Nano) // gốc file, như Codex CLI ghi
-		delete(tok, s.LastRefreshKey)                                     // bản subllm cũ ghi nhầm vào đây
 	}
 	if err := s.save(doc, tok); err != nil {
 		// Server đã xoay token: bỏ token mới thì file chỉ còn refresh token chết
@@ -219,8 +218,8 @@ func (s *Store) save(doc map[string]any, tok map[string]any) error {
 	// Path là symlink (công cụ đổi tài khoản) thì ghi vào file thật: rename
 	// lên chính symlink sẽ thay nó bằng file thường, file thật giữ token chết.
 	path := s.Path
-	if real, err := filepath.EvalSymlinks(path); err == nil {
-		path = real
+	if target, err := filepath.EvalSymlinks(path); err == nil {
+		path = target
 	}
 	// Tệp tạm tên riêng mỗi lần (0600), cùng thư mục để rename là atomic.
 	f, err := os.CreateTemp(filepath.Dir(path), filepath.Base(path)+".subllm-*")

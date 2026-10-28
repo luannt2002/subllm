@@ -24,7 +24,7 @@ func TestScanSSE(t *testing.T) {
 		`data: {"n":3}`, // sau DONE không được đọc nữa
 	}, "\n")
 	var got []int
-	err := ScanSSE(strings.NewReader(stream), func(data []byte) error {
+	err := scanSSE(strings.NewReader(stream), func(data []byte) error {
 		var v struct {
 			N int `json:"n"`
 		}
@@ -35,10 +35,10 @@ func TestScanSSE(t *testing.T) {
 		return nil
 	})
 	if err != nil {
-		t.Fatalf("ScanSSE lỗi: %v", err)
+		t.Fatalf("scanSSE lỗi: %v", err)
 	}
 	if len(got) != 2 || got[0] != 1 || got[1] != 2 {
-		t.Fatalf("ScanSSE nhận %v, muốn [1 2]", got)
+		t.Fatalf("scanSSE nhận %v, muốn [1 2]", got)
 	}
 }
 
@@ -97,7 +97,7 @@ func TestContentParts(t *testing.T) {
 		`[{"type":"input_audio","input_audio":{"data":"x","format":"wav"}}]`,
 		`[{"type":"image_url","image_url":{}}]`,
 		`[{"type":"file","file":{"file_id":"file-1"}}]`,
-		// thiếu "type" mà mang ảnh/file: trước đây thành chữ rỗng, ảnh rơi lặng lẽ
+		// thiếu "type" mà không phải chữ (ảnh, file, audio): không được coi là chữ rỗng
 		`[{"image_url":{"url":"data:image/png;base64,AAA"}}]`,
 		`[{"file":{"filename":"a.pdf","file_data":"data:application/pdf;base64,BBB"}}]`,
 		`[{"file":{"file_id":"file-1"}}]`,

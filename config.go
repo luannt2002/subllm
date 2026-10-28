@@ -182,8 +182,8 @@ func canonicalPath(p string) string {
 	if err != nil {
 		abs = filepath.Clean(p)
 	}
-	if real, err := filepath.EvalSymlinks(abs); err == nil {
-		return real
+	if resolved, err := filepath.EvalSymlinks(abs); err == nil {
+		return resolved
 	}
 	if dir, err := filepath.EvalSymlinks(filepath.Dir(abs)); err == nil {
 		return filepath.Join(dir, filepath.Base(abs))

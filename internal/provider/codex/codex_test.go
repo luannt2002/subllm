@@ -125,7 +125,7 @@ func TestCodexEvent(t *testing.T) {
 }
 
 // reasoning_effort → "reasoning": {"effort": …} của Responses API; không gửi
-// thì body giữ nguyên như cũ (không có khoá reasoning).
+// thì body không có khoá reasoning.
 func TestCodexReasoningEffort(t *testing.T) {
 	req := provider.ChatRequest{Model: "pa-model", Messages: []provider.ChatMessage{{Role: "user", Content: json.RawMessage(`"hi"`)}}}
 	payload, err := toPayload(req)

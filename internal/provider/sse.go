@@ -22,10 +22,10 @@ const (
 	ErrSnippet = 300
 )
 
-// ScanSSE — đọc từng sự kiện từ r, gọi handle với mỗi payload "data:".
+// scanSSE — đọc từng sự kiện từ r, gọi handle với mỗi payload "data:".
 // Dừng khi stream kết thúc, handle trả lỗi, hoặc gặp "[DONE]" (không gọi
 // handle cho nó). payload rỗng/là comment bị bỏ qua.
-func ScanSSE(r io.Reader, handle func(data []byte) error) error {
+func scanSSE(r io.Reader, handle func(data []byte) error) error {
 	sc := bufio.NewScanner(r)
 	sc.Buffer(make([]byte, 0, 64<<10), maxEventBytes)
 	for sc.Scan() {
@@ -74,7 +74,7 @@ func StreamSSE(client *http.Client, req *http.Request, label string,
 			Msg:        fmt.Sprintf("%s HTTP %d: %s", label, resp.StatusCode, Truncate(raw, ErrSnippet)),
 		}
 	}
-	return ScanSSE(resp.Body, func(data []byte) error {
+	return scanSSE(resp.Body, func(data []byte) error {
 		ev, err := decode(data)
 		if err != nil {
 			return err

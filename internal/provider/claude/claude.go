@@ -1,6 +1,5 @@
 // Package claude — strategy backend Anthropic Messages API bằng đăng nhập
-// Claude Code (gói Pro/Max) — thử nghiệm: token + /v1/models đã chạy trên máy,
-// chat chưa (xem README). Luồng:
+// Claude Code (gói Pro/Max) — thử nghiệm, xem README. Luồng:
 //   - token: file credential của Claude Code → object "claudeAiOauth"
 //     {accessToken, refreshToken, expiresAt(ms)}; refresh dạng JSON body với
 //     client_id của Claude Code;
