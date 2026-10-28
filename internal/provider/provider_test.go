@@ -2,8 +2,13 @@ package provider
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestScanSSE(t *testing.T) {
@@ -90,6 +95,40 @@ func TestContentParts(t *testing.T) {
 	} {
 		if _, err := (ChatMessage{Content: json.RawMessage(bad)}).Parts(); err == nil {
 			t.Fatalf("phải lỗi: %s", bad)
+		}
+	}
+}
+
+// StreamSSE với HTTP thật: lỗi upstream phải thành UpstreamError đúng mã và
+// thời gian nghỉ — router dựa vào đó để failover và cho tài khoản nghỉ.
+// Codex báo giờ reset hạn mức trong body 429 (error.resets_in_seconds),
+// không qua header Retry-After.
+func TestStreamSSEUpstreamError(t *testing.T) {
+	cases := []struct {
+		name   string
+		status int
+		header string
+		body   string
+		want   time.Duration
+	}{
+		{"429 + Retry-After", 429, "120", `{"error":{"message":"x"}}`, 2 * time.Minute},
+		{"429 chỉ có resets_in_seconds", 429, "", `{"error":{"type":"usage_limit_reached","resets_at":1,"limit_window_minutes":300,"resets_in_seconds":4313}}`, 4313 * time.Second},
+		{"503", 503, "", `{"error":{"resets_in_seconds":9}}`, 0},
+	}
+	for _, tc := range cases {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if tc.header != "" {
+				w.Header().Set("Retry-After", tc.header)
+			}
+			w.WriteHeader(tc.status)
+			fmt.Fprint(w, tc.body)
+		}))
+		req, _ := http.NewRequest(http.MethodPost, srv.URL, nil)
+		err := StreamSSE(srv.Client(), req, "t", nil, nil)
+		srv.Close()
+		var up *UpstreamError
+		if !errors.As(err, &up) || up.Status != tc.status || up.RetryAfter != tc.want {
+			t.Fatalf("%s: muốn UpstreamError{%d, %v}, nhận %T %+v", tc.name, tc.status, tc.want, err, err)
 		}
 	}
 }

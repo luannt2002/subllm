@@ -3,6 +3,7 @@ package provider
 // errors.go — lỗi có kiểu để Router quyết định failover sang tài khoản khác.
 
 import (
+	"encoding/json"
 	"errors"
 	"math"
 	"net/http"
@@ -63,4 +64,22 @@ func parseRetryAfter(v string, now time.Time) time.Duration {
 		return t.Sub(now)
 	}
 	return 0
+}
+
+// retryAfterFromBody — Codex báo giờ reset hạn mức trong body 429
+// (error.resets_in_seconds), không qua header Retry-After; không có → 0.
+func retryAfterFromBody(raw []byte) time.Duration {
+	var b struct {
+		Error struct {
+			ResetsInSeconds int64 `json:"resets_in_seconds"`
+		} `json:"error"`
+	}
+	if json.Unmarshal(raw, &b) != nil {
+		return 0
+	}
+	s := b.Error.ResetsInSeconds
+	if s <= 0 || s > math.MaxInt64/int64(time.Second) {
+		return 0
+	}
+	return time.Duration(s) * time.Second
 }

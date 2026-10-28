@@ -63,9 +63,13 @@ func StreamSSE(client *http.Client, req *http.Request, label string,
 
 	if resp.StatusCode != http.StatusOK {
 		raw, _ := io.ReadAll(io.LimitReader(resp.Body, maxErrorBody))
+		wait := parseRetryAfter(resp.Header.Get("Retry-After"), time.Now())
+		if wait == 0 && resp.StatusCode == http.StatusTooManyRequests {
+			wait = retryAfterFromBody(raw)
+		}
 		return &UpstreamError{
 			Status:     resp.StatusCode,
-			RetryAfter: parseRetryAfter(resp.Header.Get("Retry-After"), time.Now()),
+			RetryAfter: wait,
 			Msg:        fmt.Sprintf("%s HTTP %d: %s", label, resp.StatusCode, Truncate(raw, ErrSnippet)),
 		}
 	}

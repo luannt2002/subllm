@@ -20,6 +20,7 @@ subllm mở API tương thích OpenAI trên `<SUBLLM_HOST>:<SUBLLM_PORT>` (mẫu
 - Route theo **tiền tố model** (`MODEL_PREFIX`). Nhiều provider cùng tiền tố =
   một nhóm tài khoản, thử **theo thứ tự** trong `SUBLLM_PROVIDERS`.
 - Tài khoản dính **429** → nghỉ theo `Retry-After` của upstream (không có thì
+  `error.resets_in_seconds` trong body 429 của Codex, không có nữa thì
   `SUBLLM_COOLDOWN`), request chuyển sang tài khoản kế. Lỗi của riêng tài khoản
   (**401, 403**, file credential hỏng, refresh bị từ chối) → cũng chuyển,
   nhưng không bắt nghỉ.
