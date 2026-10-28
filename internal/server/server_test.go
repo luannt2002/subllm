@@ -123,6 +123,22 @@ func TestStatusNeedsKey(t *testing.T) {
 	}
 }
 
+// /v1/models cũng lộ tên tài khoản (owned_by) và gọi upstream bằng
+// credential: có api key thì phải đòi như /status.
+func TestModelsNeedsKey(t *testing.T) {
+	s := New(provider.NewRouter(provider.Registry{&fake{id: "acc1"}}, time.Minute), "k")
+	if rec := call(t, s, "GET", "/v1/models", ""); rec.Code != 401 {
+		t.Fatalf("/v1/models có api key thì phải đòi: %d %s", rec.Code, rec.Body)
+	}
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest("GET", "/v1/models", nil)
+	req.Header.Set("Authorization", "Bearer k")
+	s.ServeHTTP(rec, req)
+	if rec.Code != 200 || !strings.Contains(rec.Body.String(), `"owned_by":"acc1"`) {
+		t.Fatalf("đúng key phải xem được /v1/models: %d %s", rec.Code, rec.Body)
+	}
+}
+
 // spy — provider giả ghi lại request nhận được.
 type spy struct {
 	fake

@@ -100,7 +100,12 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(map[string]any{"providers": s.router.Status()})
 }
 
+// handleModels — catalog gộp; đòi key như /status (owned_by lộ tên tài khoản,
+// và mỗi lần gọi đều chạm credential upstream).
 func (s *Server) handleModels(w http.ResponseWriter, r *http.Request) {
+	if !s.authed(w, r) {
+		return
+	}
 	data := []map[string]any{}
 	for _, p := range s.router.Providers() {
 		ids, err := p.ListModels(r.Context())

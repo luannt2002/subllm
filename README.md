@@ -29,7 +29,7 @@ subllm mở API tương thích OpenAI trên `<SUBLLM_HOST>:<SUBLLM_PORT>` (mẫu
   `last_error` + `last_error_at`, `cooling_until` — chỉ có khi đang nghỉ). Giờ nghỉ chỉ kéo dài,
   không bị 429 sau ngắn hơn rút lại. Failover che lỗi khỏi client, nên tài khoản
   chết chỉ thấy được ở đây và ở log (`failover A → B: …`). Có
-  `SUBLLM_API_KEY` thì `/status` cũng đòi key (lộ tên tài khoản).
+  `SUBLLM_API_KEY` thì `/status` và `/v1/models` cũng đòi key (lộ tên tài khoản).
 
 **Ai giữ refresh token — đọc trước khi thêm tài khoản.** Refresh token xoay
 vòng: hai nơi cùng refresh một token là một bên văng đăng nhập.
