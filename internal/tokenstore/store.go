@@ -54,6 +54,14 @@ type Store struct {
 	mu       sync.Mutex // một file credential, một khóa
 	client   *http.Client
 	rejected string // refresh token server đã từ chối hẳn: không gửi lại
+	unsaved  *unsaved
+}
+
+// unsaved — token mới đã refresh mà chưa ghi được vào file. stale là
+// refresh token cũ (đã bị server xoay) còn nằm trong file.
+type unsaved struct {
+	doc, tok map[string]any
+	stale    string
 }
 
 // rejectedError — server OAuth từ chối hẳn refresh token (400/401/403, vd bị
@@ -89,6 +97,20 @@ func (s *Store) Get(ctx context.Context) (Credentials, error) {
 	tok, doc, err := s.load()
 	if err != nil {
 		return Credentials{}, err
+	}
+	inFile := field(tok, s.RefreshKey) // refresh token đang nằm trong file
+	if u := s.unsaved; u != nil {
+		if inFile == u.stale {
+			// File còn refresh token đã bị xoay: bản đúng ở bộ nhớ. Thử ghi lại;
+			// vẫn lỗi thì cứ dùng bản trong bộ nhớ.
+			tok, doc = u.tok, u.doc
+			if s.save(doc, tok) == nil {
+				s.unsaved = nil
+				inFile = field(tok, s.RefreshKey) // file giờ đã có token này
+			}
+		} else {
+			s.unsaved = nil // file đã đổi (vd login lại): file thắng
+		}
 	}
 	access := field(tok, s.AccessKey)
 	if access == "" {
@@ -146,7 +168,12 @@ func (s *Store) Get(ctx context.Context) (Credentials, error) {
 		delete(tok, s.LastRefreshKey)                                     // bản subllm cũ ghi nhầm vào đây
 	}
 	if err := s.save(doc, tok); err != nil {
-		return Credentials{}, fmt.Errorf("ghi ngược token vào %s: %w", s.Path, err)
+		// Server đã xoay token: bỏ token mới thì file chỉ còn refresh token chết
+		// → mất đăng nhập. Giữ trong bộ nhớ, Get sau ghi lại.
+		log.Printf("cảnh báo: ghi ngược token vào %s lỗi, giữ token mới trong bộ nhớ và sẽ ghi lại: %v", s.Path, err)
+		// stale là token TRONG FILE: lượt refresh thứ hai mà file vẫn chưa ghi
+		// được thì token vừa dùng để refresh (trong bộ nhớ) khác token trong file.
+		s.unsaved = &unsaved{doc: doc, tok: tok, stale: inFile}
 	}
 	// Phản hồi refresh thường không mang account_id: giữ cái đang có trong file.
 	accountID := fresh.AccountID

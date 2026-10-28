@@ -301,3 +301,102 @@ func TestConcurrentGetRefreshesOnce(t *testing.T) {
 		t.Fatalf("5 request đồng thời phải refresh đúng 1 lần, server nhận %d", n.Load())
 	}
 }
+
+// Refresh xong (server đã xoay token) mà ghi file lỗi (đĩa đầy, thư mục không
+// ghi được, file bind-mount): không được bỏ token mới — file chỉ còn refresh
+// token chết. Giữ trong bộ nhớ, request sau dùng nó và ghi lại khi ghi được.
+func TestRefreshKeepsTokenWhenSaveFails(t *testing.T) {
+	newAccess := jwtAt(time.Now().Add(time.Hour))
+	srv, n, _ := refreshServer(t, map[string]any{"access_token": newAccess, "refresh_token": "rt1"})
+	dir := t.TempDir()
+	path := filepath.Join(dir, "auth.json")
+	if err := os.WriteFile(path, []byte(`{"tokens":{"access_token":"`+jwtAt(time.Now().Add(-time.Hour))+`","refresh_token":"rt0"}}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(dir, 0500); err != nil { // không tạo được tệp tạm
+		t.Fatal(err)
+	}
+	defer os.Chmod(dir, 0700)
+	s := codexStore(path, srv.URL)
+	for i := 0; i < 2; i++ {
+		if c, err := s.Get(context.Background()); err != nil || c.AccessToken != newAccess {
+			t.Fatalf("Get #%d lúc ghi lỗi phải trả token mới: %+v %v", i, c, err)
+		}
+	}
+	if n.Load() != 1 {
+		t.Fatalf("token mới đang giữ trong bộ nhớ: không được refresh lại, server nhận %d", n.Load())
+	}
+	os.Chmod(dir, 0700) // ghi được trở lại
+	if c, err := s.Get(context.Background()); err != nil || c.AccessToken != newAccess {
+		t.Fatalf("Get sau khi ghi được: %+v %v", c, err)
+	}
+	if _, tok := readDoc(t, path); tok["refresh_token"] != "rt1" || n.Load() != 1 {
+		t.Fatalf("phải ghi bù token mới vào file: refresh_token=%v, server nhận %d", tok["refresh_token"], n.Load())
+	}
+}
+
+// Ghi file lỗi kéo dài (vd file bind-mount: rename luôn hỏng) qua nhiều lượt
+// refresh: lượt sau phải dùng refresh token mới nhất trong bộ nhớ, không bao
+// giờ gửi lại token cũ trong file (đã bị xoay); ghi được thì file có token mới nhất.
+func TestRefreshKeepsTokenAcrossRepeatedSaveFailures(t *testing.T) {
+	var sent []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r.ParseForm()
+		sent = append(sent, r.Form.Get("refresh_token"))
+		// access sống 1 phút < Margin 5 phút: Get nào cũng refresh lại
+		json.NewEncoder(w).Encode(map[string]any{"access_token": jwtAt(time.Now().Add(time.Minute)), "refresh_token": fmt.Sprintf("rt%d", len(sent))})
+	}))
+	defer srv.Close()
+	dir := t.TempDir()
+	path := filepath.Join(dir, "auth.json")
+	if err := os.WriteFile(path, []byte(`{"tokens":{"access_token":"`+jwtAt(time.Now().Add(-time.Hour))+`","refresh_token":"rt0"}}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	os.Chmod(dir, 0500)
+	defer os.Chmod(dir, 0700)
+	s := codexStore(path, srv.URL)
+	for i := 0; i < 3; i++ {
+		if _, err := s.Get(context.Background()); err != nil {
+			t.Fatalf("Get #%d: %v", i, err)
+		}
+	}
+	if want := "rt0 rt1 rt2"; fmt.Sprint(sent) != "["+want+"]" {
+		t.Fatalf("refresh phải dùng token mới nhất mỗi lượt (%s), server nhận %v", want, sent)
+	}
+	os.Chmod(dir, 0700)
+	s.Get(context.Background())
+	if _, tok := readDoc(t, path); tok["refresh_token"] != "rt4" {
+		t.Fatalf("ghi được thì file phải có token mới nhất rt4, nhận %v (server nhận %v)", tok["refresh_token"], sent)
+	}
+}
+
+// Cùng một lượt Get: ghi bù thành công (file có token mới) rồi refresh tiếp
+// mà ghi lại lỗi → bản trong bộ nhớ phải gắn với token VỪA GHI vào file,
+// không phải token cũ trước đó.
+func TestUnsavedTracksFileAfterCatchUpSave(t *testing.T) {
+	dir := t.TempDir()
+	var sent []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r.ParseForm()
+		sent = append(sent, r.Form.Get("refresh_token"))
+		if len(sent) == 2 {
+			os.Chmod(dir, 0500) // ổ hỏng lại ngay sau lần ghi bù
+		}
+		json.NewEncoder(w).Encode(map[string]any{"access_token": jwtAt(time.Now().Add(time.Minute)), "refresh_token": fmt.Sprintf("rt%d", len(sent))})
+	}))
+	defer srv.Close()
+	path := filepath.Join(dir, "auth.json")
+	if err := os.WriteFile(path, []byte(`{"tokens":{"access_token":"`+jwtAt(time.Now().Add(-time.Hour))+`","refresh_token":"rt0"}}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Chmod(dir, 0700)
+	s := codexStore(path, srv.URL)
+	os.Chmod(dir, 0500)
+	s.Get(context.Background()) // rt0 → rt1, ghi lỗi
+	os.Chmod(dir, 0700)
+	s.Get(context.Background()) // ghi bù rt1, refresh rt1 → rt2, ghi lỗi
+	s.Get(context.Background()) // phải refresh bằng rt2, không phải rt1 đã chết
+	if fmt.Sprint(sent) != "[rt0 rt1 rt2]" {
+		t.Fatalf("server phải nhận [rt0 rt1 rt2], nhận %v", sent)
+	}
+}
