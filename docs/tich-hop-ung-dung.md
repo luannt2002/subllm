@@ -16,8 +16,8 @@ ngày 28/10 trên provider kiểu `codex`.
 | chọn model | lấy `id` từ `GET /v1/models`; model được route theo tiền tố (`MODEL_PREFIX`) tới nhóm tài khoản tương ứng |
 
 subllm chỉ nghe ở loopback: ứng dụng phải chạy cùng máy, và gọi từ chương trình
-(curl, SDK, backend của ứng dụng) — request từ trình duyệt (có header `Origin`, kể cả
-extension và giao diện app Electron) hoặc với `Host` không phải loopback bị chặn 403.
+(curl, SDK, backend của ứng dụng) — request từ trình duyệt (có header `Origin`, hoặc `Sec-Fetch-Site` khác
+`none`, kể cả extension và giao diện app Electron) hoặc với `Host` không phải loopback bị chặn 403.
 
 ## 1. Hỏi – đáp text
 
@@ -118,7 +118,7 @@ thì `message` mở đầu bằng tên provider đã thử cuối.
 |---|---|---|---|
 | 400 | `invalid_request_error` | request sai: thiếu `model`/`messages`, vai lạ, part chưa hỗ trợ, `reasoning_effort` sai, backend không tải được link ảnh | sửa request, **không** thử lại |
 | 401 | `auth` | thiếu/sai API key | sửa key |
-| 403 | `forbidden` | gọi thẳng từ trình duyệt (header `Origin`) hoặc `Host` không phải loopback | gọi từ backend / chương trình cùng máy |
+| 403 | `forbidden` | gọi thẳng từ trình duyệt (header `Origin` / `Sec-Fetch-Site`) hoặc `Host` không phải loopback | gọi từ backend / chương trình cùng máy |
 | 404 | `model_not_found` | model không khớp tiền tố nào, hoặc `provider` không tồn tại | kiểm `GET /v1/models` / `GET /status` |
 | 405 | `invalid_request_error` | không dùng POST | dùng POST |
 | 413 | `invalid_request_error` | body quá 64 MiB (thường do nhiều ảnh/file base64) | thu nhỏ ảnh, tách bớt file sang request khác |

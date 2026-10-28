@@ -39,11 +39,12 @@ func New(router *provider.Router, apiKey string) *Server {
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	// Trình duyệt (có Origin) hay tên miền lạ trỏ về 127.0.0.1 (DNS
-	// rebinding → Host lạ): chặn, kẻo một trang web tiêu được gói khi chưa
-	// đặt API key. Client cùng máy (curl, SDK) không gửi Origin.
-	if r.Header.Get("Origin") != "" || !loopbackHost(r.Host) {
-		writeErr(w, http.StatusForbidden, "subllm chỉ nhận request từ chương trình cùng máy (không Origin, Host là loopback)", "forbidden")
+	// Trình duyệt (có Origin; <img>/no-cors GET thì có Sec-Fetch-Site) hay tên
+	// miền lạ trỏ về 127.0.0.1 (DNS rebinding → Host lạ): chặn, kẻo một trang
+	// web tiêu được gói khi chưa đặt API key. Client cùng máy (curl, SDK) không
+	// gửi hai header này; Sec-Fetch-Site "none" = người dùng tự gõ URL.
+	if site := r.Header.Get("Sec-Fetch-Site"); r.Header.Get("Origin") != "" || (site != "" && site != "none") || !loopbackHost(r.Host) {
+		writeErr(w, http.StatusForbidden, "subllm chỉ nhận request từ chương trình cùng máy (không Origin / Sec-Fetch-Site, Host là loopback)", "forbidden")
 		return
 	}
 	switch r.URL.Path {

@@ -247,6 +247,17 @@ func TestRejectsBrowserAndForeignHost(t *testing.T) {
 			t.Fatalf("%s origin=%q: muốn %d, nhận %d %s", tc.url, tc.origin, tc.want, rec.Code, rec.Body)
 		}
 	}
+	// <img src> / no-cors GET từ trang lạ không có Origin nhưng trình duyệt gắn
+	// Sec-Fetch-Site; "none" = người dùng tự gõ URL (vd xem /status) → cho qua.
+	for site, want := range map[string]int{"cross-site": 403, "same-site": 403, "none": 200} {
+		req := httptest.NewRequest("GET", "http://127.0.0.1:18080/v1/models", nil)
+		req.Header.Set("Sec-Fetch-Site", site)
+		rec := httptest.NewRecorder()
+		s.ServeHTTP(rec, req)
+		if rec.Code != want {
+			t.Fatalf("Sec-Fetch-Site %s: muốn %d, nhận %d", site, want, rec.Code)
+		}
+	}
 	// HTTP/1.0 không có Host: không phải trình duyệt (trình duyệt luôn gửi Host) → cho qua.
 	req := httptest.NewRequest("GET", "http://127.0.0.1/healthz", nil)
 	req.Host = ""
