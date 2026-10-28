@@ -14,9 +14,10 @@ import (
 
 // fake — provider giả: err != nil thì lỗi trước khi phát gì; text thì phát.
 type fake struct {
-	id   string
-	text string
-	err  error
+	id     string
+	text   string
+	finish string // finish backend báo kèm chữ (vd "length" khi bị cắt)
+	err    error
 }
 
 func (f *fake) ID() string                                   { return f.id }
@@ -26,7 +27,7 @@ func (f *fake) StreamChat(_ context.Context, _ provider.ChatRequest, emit func(p
 	if f.err != nil {
 		return f.err
 	}
-	emit(provider.StreamEvent{Text: f.text})
+	emit(provider.StreamEvent{Text: f.text, Finish: f.finish})
 	return nil
 }
 
@@ -154,11 +155,11 @@ func TestChatBodyTooLarge(t *testing.T) {
 	}
 }
 
-// lateErr — phát một sự kiện rỗng (như response.created) rồi mới lỗi.
+// lateErr — phát chữ (rỗng = sự kiện như response.created) rồi mới lỗi.
 type lateErr struct{ fake }
 
 func (f *lateErr) StreamChat(_ context.Context, _ provider.ChatRequest, emit func(provider.StreamEvent) error) error {
-	_ = emit(provider.StreamEvent{})
+	_ = emit(provider.StreamEvent{Text: f.text})
 	return f.err
 }
 
@@ -176,6 +177,29 @@ func TestRequestErrorMidStream(t *testing.T) {
 		if !strings.Contains(st, `"name":"acc1","ok":0,"failed":0`) || !strings.Contains(st, `"name":"acc2","ok":0`) {
 			t.Fatalf("stream=%s: không failover, không tính lỗi tài khoản: %s", stream, st)
 		}
+	}
+}
+
+// Câu trả lời bị cắt (backend báo finish "length") → client thấy "length",
+// không phải "stop"; lỗi sau khi đã có chữ → chunk cuối "error" + [DONE].
+func TestFinishReason(t *testing.T) {
+	chat := func(p provider.Provider, stream string) string {
+		s := New(provider.NewRouter(provider.Registry{p}, time.Minute), "")
+		return call(t, s, "POST", "/v1/chat/completions", `{"model":"m-x","stream":`+stream+`,"messages":[{"role":"user","content":"x"}]}`).Body.String()
+	}
+	cut := &fake{id: "acc1", text: "dở", finish: "length"}
+	if b := chat(cut, "false"); !strings.Contains(b, `"finish_reason":"length"`) {
+		t.Fatalf("non-stream bị cắt phải length: %s", b)
+	}
+	if b := chat(cut, "true"); !strings.Contains(b, `"finish_reason":"length"`) || !strings.HasSuffix(b, "data: [DONE]\n\n") {
+		t.Fatalf("stream bị cắt phải length: %s", b)
+	}
+	broken := &lateErr{fake{id: "acc1", text: "dở", err: errors.New("mất mạng giữa chừng")}}
+	if b := chat(broken, "true"); !strings.Contains(b, `"content":"dở"`) || !strings.Contains(b, `"finish_reason":"error"`) || !strings.HasSuffix(b, "data: [DONE]\n\n") {
+		t.Fatalf("lỗi giữa stream phải chunk cuối error + [DONE]: %s", b)
+	}
+	if b := chat(&fake{id: "acc1", text: "đủ"}, "false"); !strings.Contains(b, `"finish_reason":"stop"`) {
+		t.Fatalf("bình thường phải stop: %s", b)
 	}
 }
 

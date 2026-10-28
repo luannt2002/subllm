@@ -89,6 +89,13 @@ func TestClaudeEvent(t *testing.T) {
 	if ev.Usage == nil || ev.Usage.CompletionTokens != 3 {
 		t.Fatalf("message_delta usage sai: %+v", ev.Usage)
 	}
+	if ev.Finish != "" {
+		t.Fatalf("message_delta không có stop_reason max_tokens thì không đặt finish: %+v", ev)
+	}
+	// Chạm max_tokens → finish "length" (câu trả lời bị cắt).
+	if cut, _ := decodeEvent([]byte(`{"type":"message_delta","delta":{"stop_reason":"max_tokens"},"usage":{"output_tokens":3}}`)); cut.Finish != "length" {
+		t.Fatalf("stop_reason max_tokens phải finish length: %+v", cut)
+	}
 	// server cộng dồn usage các sự kiện: total phải gồm cả output.
 	if sum := start.Usage.Add(*ev.Usage); sum.TotalTokens != 10 {
 		t.Fatalf("total_tokens phải 7+3=10, nhận %+v", sum)

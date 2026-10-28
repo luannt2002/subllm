@@ -11,10 +11,13 @@ import (
 )
 
 // StreamEvent — một nốt phát ra từ upstream, trung tính giữa các backend:
-// text là mẩu chữ, Usage cộng dồn.
+// text là mẩu chữ, Usage cộng dồn, Finish là finish_reason kiểu OpenAI khi
+// backend báo câu trả lời bị cắt ("length", "content_filter"); rỗng = bình
+// thường.
 type StreamEvent struct {
-	Text  string
-	Usage *Usage
+	Text   string
+	Usage  *Usage
+	Finish string
 }
 
 // Provider — một backend subscription (codex, claude…).

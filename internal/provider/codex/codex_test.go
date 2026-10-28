@@ -107,6 +107,16 @@ func TestCodexEvent(t *testing.T) {
 	if err == nil || errors.As(err, &re) {
 		t.Fatalf("error.type khác invalid_request_error phải là lỗi backend: %T %v", err, err)
 	}
+	// Bị cắt (payload thật, max_output_tokens) → usage + finish "length";
+	// lọc nội dung → "content_filter". Không thì client tưởng câu trả lời đủ.
+	ev, err = decodeEvent([]byte(`{"type":"response.incomplete","response":{"status":"incomplete","incomplete_details":{"reason":"max_output_tokens"},"usage":{"input_tokens":23,"output_tokens":16,"total_tokens":39}}}`))
+	if err != nil || ev.Finish != "length" || ev.Usage == nil || ev.Usage.TotalTokens != 39 {
+		t.Fatalf("incomplete sai: %+v err=%v", ev, err)
+	}
+	ev, _ = decodeEvent([]byte(`{"type":"response.incomplete","response":{"incomplete_details":{"reason":"content_filter"}}}`))
+	if ev.Finish != "content_filter" {
+		t.Fatalf("incomplete content_filter sai: %+v", ev)
+	}
 	// sự kiện bỏ qua: created, in_progress…
 	ev, _ = decodeEvent([]byte(`{"type":"response.created"}`))
 	if ev.Text != "" || ev.Usage != nil {

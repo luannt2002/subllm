@@ -165,9 +165,13 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 func (s *Server) serveBuffered(w http.ResponseWriter, r *http.Request, plan []provider.Provider, req provider.ChatRequest, reqID string) {
 	var text strings.Builder
 	var usage provider.Usage
+	finish := "stop" // backend báo bị cắt thì đổi theo ev.Finish
 	err := s.router.Stream(r.Context(), plan, req, func(ev provider.StreamEvent) error {
 		if ev.Usage != nil {
 			usage = usage.Add(*ev.Usage)
+		}
+		if ev.Finish != "" {
+			finish = ev.Finish
 		}
 		text.WriteString(ev.Text)
 		return nil
@@ -180,7 +184,7 @@ func (s *Server) serveBuffered(w http.ResponseWriter, r *http.Request, plan []pr
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(completion{
 		ID: reqID, Object: "chat.completion", Created: time.Now().Unix(), Model: req.Model,
-		Choices: []choiceOut{{Index: 0, Message: messageOut{Role: "assistant", Content: text.String()}, FinishReason: "stop"}},
+		Choices: []choiceOut{{Index: 0, Message: messageOut{Role: "assistant", Content: text.String()}, FinishReason: finish}},
 		Usage:   usage,
 	})
 }
@@ -204,9 +208,13 @@ func (s *Server) serveStream(w http.ResponseWriter, r *http.Request, plan []prov
 	}
 
 	var usage provider.Usage
+	finish := "stop" // backend báo bị cắt thì đổi theo ev.Finish
 	err := s.router.Stream(r.Context(), plan, req, func(ev provider.StreamEvent) error {
 		if ev.Usage != nil {
 			usage = usage.Add(*ev.Usage)
+		}
+		if ev.Finish != "" {
+			finish = ev.Finish
 		}
 		if ev.Text == "" {
 			return nil
@@ -224,7 +232,6 @@ func (s *Server) serveStream(w http.ResponseWriter, r *http.Request, plan []prov
 		writeRouteErr(w, err)
 		return
 	}
-	finish := "stop"
 	if err != nil {
 		// Đã gửi headers nên không đổi status được nữa: báo lỗi qua chunk
 		// cuối với finish_reason="error" + ghi log server.

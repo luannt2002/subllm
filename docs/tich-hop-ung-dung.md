@@ -29,8 +29,9 @@ curl -s http://127.0.0.1:18080/v1/chat/completions -H 'Content-Type: application
 ```
 
 Phản hồi đúng dạng OpenAI: `choices[0].message.content`, `usage`
-(`prompt_tokens` / `completion_tokens` / `total_tokens`), `finish_reason` luôn
-là `"stop"`.
+(`prompt_tokens` / `completion_tokens` / `total_tokens`), `finish_reason` là
+`"stop"`, hoặc `"length"` / `"content_filter"` khi backend báo câu trả lời bị
+cắt (chạm trần output, bị lọc nội dung) — gặp thì đừng coi là câu trả lời đủ.
 
 Nhiều câu hỏi trong một lượt: mảng part text (xem mục 4) hoặc gộp vào một
 chuỗi. Dặn rõ *"trả lời đủ N câu, đánh số"* để model không bỏ câu.
@@ -69,6 +70,8 @@ data: [DONE]
 - Lỗi **trước** chữ đầu tiên → mã HTTP thật (400/404/413/429/502), không phải 200.
 - Lỗi **giữa chừng** (đã gửi chữ) → chunk cuối có `finish_reason: "error"`, rồi
   `[DONE]`. Client nên coi câu trả lời là dở dang.
+- Bị cắt (trần output, lọc nội dung) → chunk cuối `finish_reason: "length"` /
+  `"content_filter"` thay vì `"stop"`.
 - Stream **không** có `usage`. Cần đếm token thì gọi non-stream.
 
 ## 4. Ảnh và file

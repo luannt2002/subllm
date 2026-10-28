@@ -145,6 +145,9 @@ func decodeEvent(data []byte) (provider.StreamEvent, error) {
 				OutputTokens int `json:"output_tokens"`
 				TotalTokens  int `json:"total_tokens"`
 			} `json:"usage"`
+			IncompleteDetails struct {
+				Reason string `json:"reason"`
+			} `json:"incomplete_details"`
 		} `json:"response"`
 		Error *struct {
 			Type string `json:"type"`
@@ -156,10 +159,16 @@ func decodeEvent(data []byte) (provider.StreamEvent, error) {
 	switch {
 	case ev.Type == "response.output_text.delta":
 		return provider.StreamEvent{Text: ev.Delta}, nil
-	case ev.Type == "response.completed":
+	case ev.Type == "response.completed" || ev.Type == "response.incomplete":
 		var out provider.StreamEvent
 		if u := ev.Response.Usage; u != nil {
 			out.Usage = &provider.Usage{PromptTokens: u.InputTokens, CompletionTokens: u.OutputTokens, TotalTokens: u.TotalTokens}
+		}
+		if ev.Type == "response.incomplete" { // bị cắt (vd max_output_tokens): không được báo "stop"
+			out.Finish = "length"
+			if ev.Response.IncompleteDetails.Reason == "content_filter" {
+				out.Finish = "content_filter"
+			}
 		}
 		return out, nil
 	case ev.Type == "response.failed" || strings.HasPrefix(ev.Type, "error"):

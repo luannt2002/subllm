@@ -198,7 +198,11 @@ func decodeEvent(data []byte) (provider.StreamEvent, error) {
 		return provider.StreamEvent{Usage: &provider.Usage{PromptTokens: u.InputTokens, TotalTokens: u.InputTokens}}, nil
 	case "message_delta":
 		out := ev.Usage.OutputTokens
-		return provider.StreamEvent{Usage: &provider.Usage{CompletionTokens: out, TotalTokens: out}}, nil
+		res := provider.StreamEvent{Usage: &provider.Usage{CompletionTokens: out, TotalTokens: out}}
+		if ev.Delta.StopReason == "max_tokens" {
+			res.Finish = "length" // bị cắt: không được báo "stop"
+		}
+		return res, nil
 	case "error":
 		if ev.Error == nil {
 			return provider.StreamEvent{}, fmt.Errorf("backend claude lỗi: %s", provider.Truncate(data, provider.ErrSnippet))
