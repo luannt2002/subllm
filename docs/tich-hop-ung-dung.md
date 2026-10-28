@@ -66,7 +66,7 @@ data: {…"delta":{},"finish_reason":"stop"}]}
 data: [DONE]
 ```
 
-- Lỗi **trước** chữ đầu tiên → mã HTTP thật (400/404/429/502), không phải 200.
+- Lỗi **trước** chữ đầu tiên → mã HTTP thật (400/404/413/429/502), không phải 200.
 - Lỗi **giữa chừng** (đã gửi chữ) → chunk cuối có `finish_reason: "error"`, rồi
   `[DONE]`. Client nên coi câu trả lời là dở dang.
 - Stream **không** có `usage`. Cần đếm token thì gọi non-stream.

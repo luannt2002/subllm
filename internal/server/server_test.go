@@ -154,6 +154,31 @@ func TestChatBodyTooLarge(t *testing.T) {
 	}
 }
 
+// lateErr — phát một sự kiện rỗng (như response.created) rồi mới lỗi.
+type lateErr struct{ fake }
+
+func (f *lateErr) StreamChat(_ context.Context, _ provider.ChatRequest, emit func(provider.StreamEvent) error) error {
+	_ = emit(provider.StreamEvent{})
+	return f.err
+}
+
+// Lỗi request báo giữa stream (sau sự kiện rỗng, trước chữ đầu) → 400 cả
+// non-stream lẫn stream, không failover, không tính lỗi tài khoản.
+func TestRequestErrorMidStream(t *testing.T) {
+	for _, stream := range []string{"false", "true"} {
+		bad := &lateErr{fake{id: "acc1", err: &provider.RequestError{Err: errors.New("link ảnh không tải được")}}}
+		s := New(provider.NewRouter(provider.Registry{bad, &fake{id: "acc2", text: "chào"}}, time.Minute), "")
+		rec := call(t, s, "POST", "/v1/chat/completions", `{"model":"m-x","stream":`+stream+`,"messages":[{"role":"user","content":"x"}]}`)
+		if rec.Code != 400 {
+			t.Fatalf("stream=%s: phải 400, nhận %d %s", stream, rec.Code, rec.Body)
+		}
+		st := call(t, s, "GET", "/status", "").Body.String()
+		if !strings.Contains(st, `"name":"acc1","ok":0,"failed":0`) || !strings.Contains(st, `"name":"acc2","ok":0`) {
+			t.Fatalf("stream=%s: không failover, không tính lỗi tài khoản: %s", stream, st)
+		}
+	}
+}
+
 // spy — provider giả ghi lại request nhận được.
 type spy struct {
 	fake

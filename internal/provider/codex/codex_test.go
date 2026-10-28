@@ -102,6 +102,11 @@ func TestCodexEvent(t *testing.T) {
 	if !errors.As(err, &re) {
 		t.Fatalf("invalid_request_error phải là RequestError, nhận %T %v", err, err)
 	}
+	// error.type khác (vd lỗi máy chủ) vẫn là lỗi backend → 502.
+	_, err = decodeEvent([]byte(`{"type":"error","error":{"type":"server_error","message":"x"}}`))
+	if err == nil || errors.As(err, &re) {
+		t.Fatalf("error.type khác invalid_request_error phải là lỗi backend: %T %v", err, err)
+	}
 	// sự kiện bỏ qua: created, in_progress…
 	ev, _ = decodeEvent([]byte(`{"type":"response.created"}`))
 	if ev.Text != "" || ev.Usage != nil {
