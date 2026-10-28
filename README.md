@@ -117,6 +117,10 @@ SUBLLM_PORT=19000 ./bin/subllm                        # port khác mà không s�
 pkill -f "[s]ubllm"                                   # dừng (dấu ngoặc chống tự khớp)
 ```
 
+Không cần clone: `go install github.com/luannt2002/subllm@latest` cài binary vào
+`$(go env GOPATH)/bin`; chạy ở thư mục có `.env` (mẫu lấy từ `.env.example` của
+repo) hoặc chỉ file bằng `-env <đường dẫn>`.
+
 Flag duy nhất: `-env`; mọi cấu hình khác qua env (key không đi qua flag để
 khỏi lộ cho mọi user trên máy qua `ps`).
 

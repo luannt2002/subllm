@@ -6,7 +6,7 @@ import (
 	"errors"
 	"testing"
 
-	"subllm/internal/provider"
+	"github.com/luannt2002/subllm/internal/provider"
 )
 
 func TestChatToCodexPayload(t *testing.T) {

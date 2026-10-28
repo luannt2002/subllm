@@ -15,8 +15,8 @@ import (
 	"strconv"
 	"strings"
 
-	"subllm/internal/provider"
-	"subllm/internal/server"
+	"github.com/luannt2002/subllm/internal/provider"
+	"github.com/luannt2002/subllm/internal/server"
 )
 
 func main() {

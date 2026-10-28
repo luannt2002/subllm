@@ -22,8 +22,8 @@ import (
 	"strings"
 	"time"
 
-	"subllm/internal/provider"
-	"subllm/internal/tokenstore"
+	"github.com/luannt2002/subllm/internal/provider"
+	"github.com/luannt2002/subllm/internal/tokenstore"
 )
 
 // Config — cấu hình một provider kiểu claude; config.go đọc từng field từ

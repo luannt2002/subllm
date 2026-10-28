@@ -28,9 +28,9 @@ import (
 	"strings"
 	"time"
 
-	"subllm/internal/provider"
-	"subllm/internal/provider/claude"
-	"subllm/internal/provider/codex"
+	"github.com/luannt2002/subllm/internal/provider"
+	"github.com/luannt2002/subllm/internal/provider/claude"
+	"github.com/luannt2002/subllm/internal/provider/codex"
 )
 
 // adapters — giao thức subllm biết nói, theo TYPE trong env. Thêm tài khoản

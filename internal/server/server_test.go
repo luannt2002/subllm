@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"subllm/internal/provider"
+	"github.com/luannt2002/subllm/internal/provider"
 )
 
 // fake — provider giả: err != nil thì lỗi trước khi phát gì; text thì phát.

@@ -16,7 +16,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"subllm/internal/provider"
+	"github.com/luannt2002/subllm/internal/provider"
 )
 
 // maxChatBody — trần body POST /v1/chat/completions: giới hạn an toàn bộ

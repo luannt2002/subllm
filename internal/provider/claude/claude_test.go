@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"subllm/internal/provider"
+	"github.com/luannt2002/subllm/internal/provider"
 )
 
 func TestChatToClaudePayload(t *testing.T) {

@@ -3,7 +3,7 @@ package server
 // types.go — kiểu phản hồi mặt OpenAI chat completions: đây là "mặt tiền"
 // subllm trả ra ngoài, chỉ server dùng.
 
-import "subllm/internal/provider"
+import "github.com/luannt2002/subllm/internal/provider"
 
 // deltaBody — phần thay đổi trong một chunk stream.
 type deltaBody struct {
