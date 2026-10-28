@@ -1,0 +1,7 @@
+bin/
+.env
+.env.*
+!.env.example
+/subllm
+*.test
+*.out
