@@ -157,7 +157,7 @@ func decodeEvent(data []byte) (provider.StreamEvent, error) {
 	case ev.Type == "response.output_text.delta":
 		return provider.StreamEvent{Text: ev.Delta}, nil
 	case ev.Type == "response.completed":
-		out := provider.StreamEvent{Done: true}
+		var out provider.StreamEvent
 		if u := ev.Response.Usage; u != nil {
 			out.Usage = &provider.Usage{PromptTokens: u.InputTokens, CompletionTokens: u.OutputTokens, TotalTokens: u.TotalTokens}
 		}

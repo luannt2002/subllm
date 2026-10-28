@@ -93,9 +93,8 @@ func TestClaudeEvent(t *testing.T) {
 	if sum := start.Usage.Add(*ev.Usage); sum.TotalTokens != 10 {
 		t.Fatalf("total_tokens phải 7+3=10, nhận %+v", sum)
 	}
-	ev, _ = decodeEvent([]byte(`{"type":"message_stop"}`))
-	if !ev.Done {
-		t.Fatal("message_stop phải Done")
+	if ev, err := decodeEvent([]byte(`{"type":"message_stop"}`)); err != nil || ev.Text != "" || ev.Usage != nil {
+		t.Fatalf("message_stop phải là sự kiện rỗng: %+v err=%v", ev, err)
 	}
 	var re *provider.RequestError
 	if _, err := decodeEvent([]byte(`{"type":"error","error":{"type":"overloaded_error","message":"quá tải"}}`)); err == nil || errors.As(err, &re) {

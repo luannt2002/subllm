@@ -85,7 +85,7 @@ func TestCodexEvent(t *testing.T) {
 		t.Fatalf("delta sai: %+v err=%v", ev, err)
 	}
 	ev, err = decodeEvent([]byte(`{"type":"response.completed","response":{"usage":{"input_tokens":10,"output_tokens":5,"total_tokens":15}}}`))
-	if err != nil || !ev.Done {
+	if err != nil {
 		t.Fatalf("completed sai: %+v err=%v", ev, err)
 	}
 	if ev.Usage == nil || ev.Usage.PromptTokens != 10 || ev.Usage.TotalTokens != 15 {
@@ -104,7 +104,7 @@ func TestCodexEvent(t *testing.T) {
 	}
 	// sự kiện bỏ qua: created, in_progress…
 	ev, _ = decodeEvent([]byte(`{"type":"response.created"}`))
-	if ev.Text != "" || ev.Done {
+	if ev.Text != "" || ev.Usage != nil {
 		t.Fatalf("sự kiện vô hại phải rỗng: %+v", ev)
 	}
 }

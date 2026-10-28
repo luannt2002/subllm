@@ -199,8 +199,6 @@ func decodeEvent(data []byte) (provider.StreamEvent, error) {
 	case "message_delta":
 		out := ev.Usage.OutputTokens
 		return provider.StreamEvent{Usage: &provider.Usage{CompletionTokens: out, TotalTokens: out}}, nil
-	case "message_stop":
-		return provider.StreamEvent{Done: true}, nil
 	case "error":
 		if ev.Error == nil {
 			return provider.StreamEvent{}, fmt.Errorf("backend claude lỗi: %s", provider.Truncate(data, provider.ErrSnippet))
