@@ -98,6 +98,11 @@ func (s *Store) Get(ctx context.Context) (Credentials, error) {
 	// file giữ refresh token đã chết. Thời gian vẫn bị chặn bởi timeout refresh.
 	fresh, err := s.refresh(context.WithoutCancel(ctx), refreshTok)
 	if err != nil {
+		if expErr == nil && time.Until(expiry) > 0 {
+			// Token hiện tại còn hạn: dùng tạm, request sau thử refresh lại.
+			log.Printf("refresh %s lỗi, dùng tạm token còn hạn %s: %v", s.Path, time.Until(expiry).Round(time.Second), err)
+			return Credentials{AccessToken: access, AccountID: field(tok, s.AccountKey)}, nil
+		}
 		return Credentials{}, err
 	}
 	// Ghi ngược đúng các field của file đó: CLI chính thức (codex/claude)

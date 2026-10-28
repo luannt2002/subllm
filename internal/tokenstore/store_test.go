@@ -217,3 +217,20 @@ func TestLastRefreshAtRoot(t *testing.T) {
 		t.Fatalf("last_refresh gốc phải là giờ refresh vừa rồi, không nằm trong tokens: gốc=%v tokens=%v", doc["last_refresh"], tok["last_refresh"])
 	}
 }
+
+// Refresh lỗi (endpoint OAuth trục trặc) trong khoảng Margin trước hạn: token
+// hiện tại vẫn dùng được nên phải trả nó; hết hạn hẳn thì mới lỗi.
+func TestRefreshFailsTokenStillValid(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusInternalServerError) }))
+	defer srv.Close()
+	valid := jwtAt(time.Now().Add(2 * time.Minute)) // < Margin 5 phút → có thử refresh
+	path := writeFile(t, `{"tokens":{"access_token":"`+valid+`","refresh_token":"rt0","account_id":"acc-1"}}`)
+	c, err := codexStore(path, srv.URL).Get(context.Background())
+	if err != nil || c.AccessToken != valid || c.AccountID != "acc-1" {
+		t.Fatalf("token còn hạn phải dùng tạm khi refresh lỗi: %+v %v", c, err)
+	}
+	path = writeFile(t, `{"tokens":{"access_token":"`+jwtAt(time.Now().Add(-time.Minute))+`","refresh_token":"rt0"}}`)
+	if _, err := codexStore(path, srv.URL).Get(context.Background()); err == nil {
+		t.Fatal("token đã hết hạn mà refresh lỗi thì phải lỗi")
+	}
+}
